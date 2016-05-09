@@ -124,6 +124,11 @@ func readHeader(f io.Reader, hash string, isSource bool, sigBlock bool) (*rpmHea
 	}, nil
 }
 
+func (hdr *rpmHeader) HasTag(tag int) bool {
+	_, ok := hdr.entries[tag]
+	return ok
+}
+
 func (hdr *rpmHeader) Get(tag int) (interface{}, error) {
 	ent, ok := hdr.entries[tag]
 	if !ok && tag == OLDFILENAMES {
@@ -229,4 +234,70 @@ func (hdr *rpmHeader) GetBytes(tag int) ([]byte, error) {
 		return nil, fmt.Errorf("unsupported datatype for bytes")
 	}
 	return hdr.data[ent.offset : ent.offset+ent.count], nil
+}
+
+func (hdr *rpmHeader) GetNEVRA() (*NEVRA, error) {
+	name, err := hdr.GetStrings(NAME)
+	if err != nil {
+		return nil, err
+	}
+	epoch, err := hdr.GetStrings(EPOCH)
+	if err != nil {
+		return nil, err
+	}
+	version, err := hdr.GetStrings(VERSION)
+	if err != nil {
+		return nil, err
+	}
+	release, err := hdr.GetStrings(RELEASE)
+	if err != nil {
+		return nil, err
+	}
+	arch, err := hdr.GetStrings(ARCH)
+	if err != nil {
+		return nil, err
+	}
+	return &NEVRA{
+		Name:    name[0],
+		Epoch:   epoch[0],
+		Version: version[0],
+		Release: release[0],
+		Arch:    arch[0],
+	}, nil
+}
+
+func (hdr *rpmHeader) GetFiles() ([]FileInfo, error) {
+	paths, err := hdr.GetStrings(OLDFILENAMES)
+	if err != nil {
+		return nil, err
+	}
+	fileSizes, err := hdr.GetInts(FILESIZES)
+	if err != nil {
+		return nil, err
+	}
+	fileUserName, err := hdr.GetStrings(FILEUSERNAME)
+	if err != nil {
+		return nil, err
+	}
+	fileGroupName, err := hdr.GetStrings(FILEGROUPNAME)
+	if err != nil {
+		return nil, err
+	}
+	fileFlags, err := hdr.GetStrings(FILEFLAGS)
+	if err != nil {
+		return nil, err
+	}
+
+	files := make([]FileInfo, len(paths))
+	for i := 0; i < len(paths); i++ {
+		files[i] = &fileInfo{
+			name:      paths[i],
+			size:      int64(fileSizes[i]),
+			userName:  fileUserName[i],
+			groupName: fileGroupName[i],
+			flags:     fileFlags[i],
+		}
+	}
+
+	return files, nil
 }

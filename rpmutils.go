@@ -71,3 +71,37 @@ func readSignatureHeader(f io.Reader) (*rpmHeader, error) {
 	// Return signature header
 	return readHeader(f, "", isSource, true)
 }
+
+func (hdr *RpmHeader) Get(tag int) (interface{}, error) {
+	h, t := hdr.getHeader(tag)
+	return h.Get(t)
+}
+
+func (hdr *RpmHeader) GetStrings(tag int) ([]string, error) {
+	h, t := hdr.getHeader(tag)
+	return h.GetStrings(t)
+}
+
+func (hdr *RpmHeader) GetInts(tag int) ([]int, error) {
+	h, t := hdr.getHeader(tag)
+	return h.GetInts(t)
+}
+
+func (hdr *RpmHeader) GetBytes(tag int) ([]byte, error) {
+	h, t := hdr.getHeader(tag)
+	return h.GetBytes(t)
+}
+
+func (hdr *RpmHeader) getHeader(tag int) (*rpmHeader, int) {
+	if tag > _SIGHEADER_TAG_BASE {
+		return hdr.sigHeader, tag - _SIGHEADER_TAG_BASE
+	}
+	if tag < _GENERAL_TAG_BASE {
+		return hdr.sigHeader, tag
+	}
+	return hdr.genHeader, tag
+}
+
+func (hdr *RpmHeader) GetNEVRA() (*NEVRA, error) {
+	return hdr.genHeader.GetNEVRA()
+}

@@ -22,6 +22,7 @@ import (
 )
 
 func TestReadHeader(t *testing.T) {
+	//SetupLogging(os.Stderr, os.Stderr, true, true)
 	f, err := os.Open("./testdata/simple-1.0.1-1.i386.rpm")
 	if err != nil {
 		t.Fatal(err)
@@ -34,5 +35,14 @@ func TestReadHeader(t *testing.T) {
 
 	if hdr == nil {
 		t.Fatal("no header found")
+	}
+
+	nevra, err := hdr.GetNEVRA()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if nevra.Epoch != "0" || nevra.Name != "simple" || nevra.Version != "1.0.1" || nevra.Release != "1" || nevra.Arch != "i386" {
+		t.Fatalf("incorrect nevra: %s-%s:%s-%s.%s", nevra.Name, nevra.Epoch, nevra.Version, nevra.Release, nevra.Arch)
 	}
 }

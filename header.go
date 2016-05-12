@@ -242,8 +242,9 @@ func (hdr *rpmHeader) GetNEVRA() (*NEVRA, error) {
 		return nil, err
 	}
 	epoch, err := hdr.GetStrings(EPOCH)
-	if err != nil {
-		return nil, err
+	// Special case epoch, if it doesn't exist, it should be 0 or None
+	if epoch == nil {
+		epoch = []string{"0"}
 	}
 	version, err := hdr.GetStrings(VERSION)
 	if err != nil {

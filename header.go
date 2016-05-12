@@ -176,7 +176,7 @@ func (hdr *rpmHeader) GetStrings(tag int) ([]string, error) {
 	}
 	// RPM_STRING_TYPE, RPM_STRING_ARRAY_TYPE, RPM_I18STRING_TYPE
 	if ent.dataType != 6 && ent.dataType != 8 && ent.dataType != 9 {
-		return nil, fmt.Errorf("unsupported datatype for string: %d", ent.dataType)
+		return nil, fmt.Errorf("unsupported datatype for string: %d, tag: %d", ent.dataType, tag)
 	}
 
 	offset := ent.offset
@@ -200,7 +200,7 @@ func (hdr *rpmHeader) GetInts(tag int) ([]int, error) {
 		return nil, fmt.Errorf("no such entry")
 	}
 	if ent.dataType != 2 && ent.dataType != 3 && ent.dataType != 4 {
-		return nil, fmt.Errorf("unsupported datatype for int: %d", ent.dataType)
+		return nil, fmt.Errorf("unsupported datatype for int: %d, tag %d", ent.dataType, tag)
 	}
 
 	offset := ent.offset
@@ -231,7 +231,7 @@ func (hdr *rpmHeader) GetBytes(tag int) ([]byte, error) {
 	}
 	// RPM_CHAR_TYPE, RPM_BIN_TYPE
 	if ent.dataType != 1 && ent.dataType != 7 {
-		return nil, fmt.Errorf("unsupported datatype for bytes: %d", ent.dataType)
+		return nil, fmt.Errorf("unsupported datatype for bytes: %d, tag: %d", ent.dataType, tag)
 	}
 	return hdr.data[ent.offset : ent.offset+ent.count], nil
 }

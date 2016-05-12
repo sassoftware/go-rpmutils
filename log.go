@@ -29,23 +29,26 @@ var _format = logging.MustStringFormatter(
 )
 
 func SetupLogging(cmdOut io.Writer, logFile io.Writer, debug bool, cmddebug bool) {
-	cmdBackend := logging.NewLogBackend(cmdOut, "", 0)
-	cmdLevel := logging.AddModuleLevel(cmdBackend)
-	if !cmddebug {
-		cmdLevel.SetLevel(logging.INFO, "")
-	} else {
-		cmdLevel.SetLevel(logging.DEBUG, "")
+	if cmdOut != nil {
+		cmdBackend := logging.NewLogBackend(cmdOut, "", 0)
+		cmdLevel := logging.AddModuleLevel(cmdBackend)
+		if !cmddebug {
+			cmdLevel.SetLevel(logging.INFO, "")
+		} else {
+			cmdLevel.SetLevel(logging.DEBUG, "")
+		}
+		logging.SetBackend(cmdLevel)
 	}
 
-	logBackend := logging.NewLogBackend(logFile, "", 0)
-	logFormatter := logging.NewBackendFormatter(logBackend, _format)
-	logLevel := logging.AddModuleLevel(logFormatter)
-	if !debug {
-		logLevel.SetLevel(logging.INFO, "")
-	} else {
-		logLevel.SetLevel(logging.DEBUG, "")
+	if logFile != nil {
+		logBackend := logging.NewLogBackend(logFile, "", 0)
+		logFormatter := logging.NewBackendFormatter(logBackend, _format)
+		logLevel := logging.AddModuleLevel(logFormatter)
+		if !debug {
+			logLevel.SetLevel(logging.INFO, "")
+		} else {
+			logLevel.SetLevel(logging.DEBUG, "")
+		}
+		logging.SetBackend(logLevel)
 	}
-
-	// Set the backends to be used.
-	logging.SetBackend(cmdLevel, logLevel)
 }

@@ -22,10 +22,10 @@ type NoSuchTagError struct {
 	Tag int
 }
 
-func (err *NoSuchTagError) Error() string {
+func (err NoSuchTagError) Error() string {
 	return fmt.Sprintf("No such entry %d", err.Tag)
 }
 
-func NewNoSuchTagError(tag int) *NoSuchTagError {
-	return &NoSuchTagError{Tag: tag}
+func NewNoSuchTagError(tag int) NoSuchTagError {
+	return NoSuchTagError{Tag: tag}
 }

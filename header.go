@@ -135,7 +135,7 @@ func (hdr *rpmHeader) Get(tag int) (interface{}, error) {
 		return hdr.GetStrings(tag)
 	}
 	if !ok {
-		return nil, fmt.Errorf("no such entry")
+		return nil, NewNoSuchTagError(tag)
 	}
 	switch ent.dataType {
 	case 6, 8, 9:
@@ -172,7 +172,7 @@ func (hdr *rpmHeader) GetStrings(tag int) ([]string, error) {
 	}
 
 	if !ok {
-		return nil, fmt.Errorf("no such entry: %d", tag)
+		return nil, NewNoSuchTagError(tag)
 	}
 	// RPM_STRING_TYPE, RPM_STRING_ARRAY_TYPE, RPM_I18STRING_TYPE
 	if ent.dataType != 6 && ent.dataType != 8 && ent.dataType != 9 {
@@ -197,7 +197,7 @@ func (hdr *rpmHeader) GetStrings(tag int) ([]string, error) {
 func (hdr *rpmHeader) GetInts(tag int) ([]int, error) {
 	ent, ok := hdr.entries[tag]
 	if !ok {
-		return nil, fmt.Errorf("no such entry")
+		return nil, NewNoSuchTagError(tag)
 	}
 	if ent.dataType != 2 && ent.dataType != 3 && ent.dataType != 4 {
 		return nil, fmt.Errorf("unsupported datatype for int: %d, tag %d", ent.dataType, tag)
@@ -227,7 +227,7 @@ func (hdr *rpmHeader) GetInts(tag int) ([]int, error) {
 func (hdr *rpmHeader) GetBytes(tag int) ([]byte, error) {
 	ent, ok := hdr.entries[tag]
 	if !ok {
-		return nil, fmt.Errorf("no such entry")
+		return nil, NewNoSuchTagError(tag)
 	}
 	// RPM_CHAR_TYPE, RPM_BIN_TYPE
 	if ent.dataType != 1 && ent.dataType != 7 {

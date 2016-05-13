@@ -105,3 +105,7 @@ func (hdr *RpmHeader) getHeader(tag int) (*rpmHeader, int) {
 func (hdr *RpmHeader) GetNEVRA() (*NEVRA, error) {
 	return hdr.genHeader.GetNEVRA()
 }
+
+func (hdr *RpmHeader) GetFiles() ([]FileInfo, error) {
+	return hdr.genHeader.GetFiles()
+}

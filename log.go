@@ -29,26 +29,33 @@ var _format = logging.MustStringFormatter(
 )
 
 func SetupLogging(cmdOut io.Writer, logFile io.Writer, debug bool, cmddebug bool) {
+	var cmdLevel, logLevel logging.LeveledBackend
 	if cmdOut != nil {
 		cmdBackend := logging.NewLogBackend(cmdOut, "", 0)
-		cmdLevel := logging.AddModuleLevel(cmdBackend)
+		cmdLevel = logging.AddModuleLevel(cmdBackend)
 		if !cmddebug {
 			cmdLevel.SetLevel(logging.INFO, "")
 		} else {
 			cmdLevel.SetLevel(logging.DEBUG, "")
 		}
-		logging.SetBackend(cmdLevel)
 	}
 
 	if logFile != nil {
 		logBackend := logging.NewLogBackend(logFile, "", 0)
 		logFormatter := logging.NewBackendFormatter(logBackend, _format)
-		logLevel := logging.AddModuleLevel(logFormatter)
+		logLevel = logging.AddModuleLevel(logFormatter)
 		if !debug {
 			logLevel.SetLevel(logging.INFO, "")
 		} else {
 			logLevel.SetLevel(logging.DEBUG, "")
 		}
+	}
+
+	if cmdLevel != nil && logLevel != nil {
+		logging.SetBackend(cmdLevel, logLevel)
+	} else if cmdLevel != nil {
+		logging.SetBackend(cmdLevel)
+	} else if logLevel != nil {
 		logging.SetBackend(logLevel)
 	}
 }

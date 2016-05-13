@@ -45,4 +45,13 @@ func TestReadHeader(t *testing.T) {
 	if nevra.Epoch != "0" || nevra.Name != "simple" || nevra.Version != "1.0.1" || nevra.Release != "1" || nevra.Arch != "i386" {
 		t.Fatalf("incorrect nevra: %s-%s:%s-%s.%s", nevra.Name, nevra.Epoch, nevra.Version, nevra.Release, nevra.Arch)
 	}
+
+	files, err := hdr.GetFiles()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(files) != 3 {
+		t.Fatalf("incorrect number of files %d", len(files))
+	}
 }

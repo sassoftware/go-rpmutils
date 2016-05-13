@@ -21,7 +21,7 @@ type FileInfo interface {
 	Size() int64
 	UserName() string
 	GroupName() string
-	Flags() string
+	Flags() int
 }
 
 type fileInfo struct {
@@ -29,7 +29,7 @@ type fileInfo struct {
 	size      int64
 	userName  string
 	groupName string
-	flags     string
+	flags     int
 }
 
 func (fi *fileInfo) Name() string {
@@ -48,6 +48,6 @@ func (fi *fileInfo) GroupName() string {
 	return fi.groupName
 }
 
-func (fi *fileInfo) Flags() string {
+func (fi *fileInfo) Flags() int {
 	return fi.flags
 }

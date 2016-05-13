@@ -284,7 +284,7 @@ func (hdr *rpmHeader) GetFiles() ([]FileInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	fileFlags, err := hdr.GetStrings(FILEFLAGS)
+	fileFlags, err := hdr.GetInts(FILEFLAGS)
 	if err != nil {
 		return nil, err
 	}

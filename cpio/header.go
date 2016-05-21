@@ -18,30 +18,32 @@ package cpio
 
 import (
 	"encoding/binary"
+	"fmt"
 	"io"
+	"strconv"
 )
 
 // reference http://people.freebsd.org/~kientzle/libarchive/man/cpio.5.txt
 
 const cpio_newc_header_length = 110
 
-var cpio_newc_magic = [6]byte{0, 7, 0, 7, 0, 1}
+const cpio_newc_magic = "070701"
 
 type cpio_newc_header struct {
-	c_magic     [6]byte
-	c_ino       uint16
-	c_mode      uint16
-	c_uid       uint16
-	c_gid       uint16
-	c_nlink     uint16
-	c_mtime     uint16
-	c_filesize  uint16
-	c_devmajor  uint16
-	c_devminor  uint16
-	c_rdevmajor uint16
-	c_rdevminor uint16
-	c_namesize  uint16
-	c_check     uint16
+	c_magic     string
+	c_ino       int
+	c_mode      int
+	c_uid       int
+	c_gid       int
+	c_nlink     int
+	c_mtime     int
+	c_filesize  int
+	c_devmajor  int
+	c_devminor  int
+	c_rdevmajor int
+	c_rdevminor int
+	c_namesize  int
+	c_check     int
 }
 
 type binaryReader struct {
@@ -52,52 +54,76 @@ func (br *binaryReader) Read(buf interface{}) error {
 	return binary.Read(br.r, binary.BigEndian, buf)
 }
 
+func (br *binaryReader) Read16(buf *int) error {
+	b := make([]byte, 8)
+	if err := br.Read(&b); err != nil {
+		return err
+	}
+	i, err := strconv.ParseInt(string(b), 16, 0)
+	if err != nil {
+		return err
+	}
+	*buf = int(i)
+	return nil
+}
+
 func readHeader(r io.Reader) (*cpio_newc_header, error) {
 	hdr := cpio_newc_header{}
 	br := binaryReader{r: r}
 
-	if err := br.Read(&hdr.c_magic); err != nil {
+	magic := make([]byte, 6)
+	if _, err := r.Read(magic); err != nil {
 		return nil, err
 	}
-	if err := br.Read(&hdr.c_ino); err != nil {
+	if string(magic) != cpio_newc_magic {
+		return nil, fmt.Errorf("bad magic")
+	}
+	hdr.c_magic = cpio_newc_magic
+
+	if err := br.Read16(&hdr.c_ino); err != nil {
 		return nil, err
 	}
-	if err := br.Read(&hdr.c_mode); err != nil {
+	if err := br.Read16(&hdr.c_mode); err != nil {
 		return nil, err
 	}
-	if err := br.Read(&hdr.c_uid); err != nil {
+	if err := br.Read16(&hdr.c_uid); err != nil {
 		return nil, err
 	}
-	if err := br.Read(&hdr.c_gid); err != nil {
+	if err := br.Read16(&hdr.c_gid); err != nil {
 		return nil, err
 	}
-	if err := br.Read(&hdr.c_nlink); err != nil {
+	if err := br.Read16(&hdr.c_nlink); err != nil {
 		return nil, err
 	}
-	if err := br.Read(&hdr.c_mtime); err != nil {
+	if err := br.Read16(&hdr.c_mtime); err != nil {
 		return nil, err
 	}
-	if err := br.Read(&hdr.c_filesize); err != nil {
+	if err := br.Read16(&hdr.c_filesize); err != nil {
 		return nil, err
 	}
-	if err := br.Read(&hdr.c_devmajor); err != nil {
+	if err := br.Read16(&hdr.c_devmajor); err != nil {
 		return nil, err
 	}
-	if err := br.Read(&hdr.c_devminor); err != nil {
+	if err := br.Read16(&hdr.c_devminor); err != nil {
 		return nil, err
 	}
-	if err := br.Read(&hdr.c_rdevmajor); err != nil {
+	if err := br.Read16(&hdr.c_rdevmajor); err != nil {
 		return nil, err
 	}
-	if err := br.Read(&hdr.c_rdevminor); err != nil {
+	if err := br.Read16(&hdr.c_rdevminor); err != nil {
 		return nil, err
 	}
-	if err := br.Read(&hdr.c_namesize); err != nil {
+	if err := br.Read16(&hdr.c_namesize); err != nil {
 		return nil, err
 	}
-	if err := br.Read(&hdr.c_check); err != nil {
+	if err := br.Read16(&hdr.c_check); err != nil {
 		return nil, err
 	}
+	dumpHeader(&hdr)
 
 	return &hdr, nil
+}
+
+func dumpHeader(hdr *cpio_newc_header) {
+	log.Debugf("header %v", hdr)
 }

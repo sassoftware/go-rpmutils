@@ -25,7 +25,7 @@ import (
 )
 
 func Extract(rs io.ReadSeeker, dest string) error {
-	linkMap := make(map[uint16][]string)
+	linkMap := make(map[int][]string)
 
 	stream := NewCpioStream(rs)
 

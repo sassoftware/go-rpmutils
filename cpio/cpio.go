@@ -44,7 +44,15 @@ func NewCpioStream(stream io.ReadSeeker) *CpioStream {
 }
 
 func (cs *CpioStream) ReadNextEntry() (*CpioEntry, error) {
+	// Reset the current possition pointer in case the underlying stream has moved.
+	pos, err := cs.stream.Seek(0, 1)
+	if err != nil {
+		return nil, err
+	}
+	cs.curr_pos = pos
+
 	if cs.next_pos != cs.curr_pos {
+		log.Debugf("seeking %d, curr_pos: %d, next_pos: %d", cs.next_pos-cs.curr_pos, cs.curr_pos, cs.next_pos)
 		n, err := cs.stream.Seek(cs.next_pos-cs.curr_pos, 1)
 		cs.curr_pos += n
 		if err != nil {
@@ -65,10 +73,13 @@ func (cs *CpioStream) ReadNextEntry() (*CpioEntry, error) {
 		return nil, err
 	}
 	if n != len(buf) {
+		log.Errorf("short read, got %d, expected %d", n, len(buf))
+		log.Debugf("namesize: %d", hdr.c_namesize)
 		return nil, fmt.Errorf("short read")
 	}
 
 	filename := string(buf[:len(buf)-1])
+	log.Debugf("filename: %s", filename)
 
 	offset := pad(cpio_newc_header_length+int(hdr.c_namesize)) - cpio_newc_header_length - int(hdr.c_namesize)
 
@@ -78,6 +89,13 @@ func (cs *CpioStream) ReadNextEntry() (*CpioEntry, error) {
 			return nil, err
 		}
 	}
+
+	// Reset the current possition pointer in case the underlying stream has moved.
+	pos, err = cs.stream.Seek(0, 1)
+	if err != nil {
+		return nil, err
+	}
+	cs.curr_pos = pos
 
 	// Find the next entry
 	cs.next_pos = pad64(cs.curr_pos + int64(hdr.c_filesize))

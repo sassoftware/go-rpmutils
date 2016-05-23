@@ -29,12 +29,16 @@ func Extract(rs io.ReadSeeker, dest string) error {
 
 	stream := NewCpioStream(rs)
 
-	entry, err := stream.ReadNextEntry()
-	if err != nil {
-		return err
-	}
+	for {
+		entry, err := stream.ReadNextEntry()
+		if err != nil {
+			return err
+		}
 
-	for entry.filename != TRAILER {
+		if entry.filename == TRAILER {
+			break
+		}
+
 		target := path.Join(dest, entry.filename)
 		parent := path.Dir(target)
 
@@ -49,20 +53,25 @@ func Extract(rs io.ReadSeeker, dest string) error {
 
 		mode := os.FileMode(entry.header.c_mode)
 		if mode&os.ModeCharDevice != 0 {
+			log.Debug("unpacking char device")
 			// FIXME: skipping due to lack of makedev.
 			continue
 		} else if mode&os.ModeDevice != 0 {
+			log.Debug("unpacking block device")
 			// FIXME: skipping due to lack of makedev.
 			continue
 		} else if mode&os.ModeDir != 0 {
+			log.Debug("unpacking dir")
 			if err := os.Mkdir(target, mode); err != nil {
 				return err
 			}
 		} else if mode&os.ModeNamedPipe != 0 {
+			log.Debug("unpacking named pipe")
 			if err := syscall.Mkfifo(target, uint32(mode)); err != nil {
 				return err
 			}
 		} else if mode&os.ModeSymlink != 0 {
+			log.Debug("unpacking symlink")
 			buf := make([]byte, entry.header.c_filesize)
 			if _, err := entry.payload.Read(buf); err != nil {
 				return err
@@ -71,8 +80,10 @@ func Extract(rs io.ReadSeeker, dest string) error {
 				return err
 			}
 		} else if mode&os.ModeType == 0 {
+			log.Debug("unpacking regular file")
 			// save hardlinks until after the taget is written
 			if entry.header.c_nlink > 1 && entry.header.c_filesize == 0 {
+				log.Debug("regular file is a hard link")
 				l, ok := linkMap[entry.header.c_ino]
 				if !ok {
 					l = make([]string, 0)
@@ -91,6 +102,7 @@ func Extract(rs io.ReadSeeker, dest string) error {
 				return err
 			}
 			if written != int64(entry.header.c_filesize) {
+				log.Debugf("written: %d, filesize: %d", written, entry.header.c_filesize)
 				return fmt.Errorf("short write")
 			}
 			if err := f.Close(); err != nil {

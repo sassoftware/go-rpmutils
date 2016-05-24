@@ -24,9 +24,8 @@ import (
 const TRAILER = "TRAILER!!!"
 
 type CpioEntry struct {
-	header   *cpio_newc_header
-	filename string
-	payload  *file_stream
+	Header  *cpio_newc_header
+	payload *file_stream
 }
 
 type CpioStream struct {
@@ -98,10 +97,10 @@ func (cs *CpioStream) ReadNextEntry() (*CpioEntry, error) {
 	}
 
 	// Create then entry
+	hdr.filename = filename
 	entry := CpioEntry{
-		header:   hdr,
-		filename: filename,
-		payload:  payload,
+		Header:  hdr,
+		payload: payload,
 	}
 
 	return &entry, nil

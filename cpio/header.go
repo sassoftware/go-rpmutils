@@ -44,6 +44,8 @@ type cpio_newc_header struct {
 	c_rdevminor int
 	c_namesize  int
 	c_check     int
+
+	filename string
 }
 
 type binaryReader struct {
@@ -128,4 +130,64 @@ func readHeader(r io.Reader) (*cpio_newc_header, error) {
 
 func dumpHeader(hdr *cpio_newc_header) {
 	log.Debugf("header %v", hdr)
+}
+
+func (hdr *cpio_newc_header) Magic() string {
+	return hdr.c_magic
+}
+
+func (hdr *cpio_newc_header) Ino() int {
+	return hdr.c_ino
+}
+
+func (hdr *cpio_newc_header) Mode() int {
+	return hdr.c_mode
+}
+
+func (hdr *cpio_newc_header) Uid() int {
+	return hdr.c_uid
+}
+
+func (hdr *cpio_newc_header) Gid() int {
+	return hdr.c_gid
+}
+
+func (hdr *cpio_newc_header) Nlink() int {
+	return hdr.c_nlink
+}
+
+func (hdr *cpio_newc_header) Mtime() int {
+	return hdr.c_mtime
+}
+
+func (hdr *cpio_newc_header) Filesize() int {
+	return hdr.c_filesize
+}
+
+func (hdr *cpio_newc_header) Devmajor() int {
+	return hdr.c_devmajor
+}
+
+func (hdr *cpio_newc_header) Devminor() int {
+	return hdr.c_devminor
+}
+
+func (hdr *cpio_newc_header) Rdevmajor() int {
+	return hdr.c_rdevmajor
+}
+
+func (hdr *cpio_newc_header) Rdevminor() int {
+	return hdr.c_rdevminor
+}
+
+func (hdr *cpio_newc_header) Namesize() int {
+	return hdr.c_namesize
+}
+
+func (hdr *cpio_newc_header) Check() int {
+	return hdr.c_check
+}
+
+func (hdr *cpio_newc_header) Filename() string {
+	return hdr.filename
 }

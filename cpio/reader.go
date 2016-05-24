@@ -36,7 +36,7 @@ func (r *Reader) Next() (*cpio_newc_header, error) {
 		return nil, err
 	}
 	r.cur_ent = ent
-	return r.cur_ent.header, nil
+	return r.cur_ent.Header, nil
 }
 
 func (r *Reader) Read(p []byte) (n int, err error) {

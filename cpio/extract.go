@@ -35,11 +35,11 @@ func Extract(rs io.Reader, dest string) error {
 			return err
 		}
 
-		if entry.filename == TRAILER {
+		if entry.Header.filename == TRAILER {
 			break
 		}
 
-		target := path.Join(dest, entry.filename)
+		target := path.Join(dest, entry.Header.filename)
 		parent := path.Dir(target)
 
 		// Create the parent directory if it doesn't exist.
@@ -51,7 +51,7 @@ func Extract(rs io.Reader, dest string) error {
 
 		// FIXME: Need a makedev implementation in go.
 
-		mode := os.FileMode(entry.header.c_mode)
+		mode := os.FileMode(entry.Header.c_mode)
 		if mode&os.ModeCharDevice != 0 {
 			log.Debug("unpacking char device")
 			// FIXME: skipping due to lack of makedev.
@@ -72,7 +72,7 @@ func Extract(rs io.Reader, dest string) error {
 			}
 		} else if mode&os.ModeSymlink != 0 {
 			log.Debug("unpacking symlink")
-			buf := make([]byte, entry.header.c_filesize)
+			buf := make([]byte, entry.Header.c_filesize)
 			if _, err := entry.payload.Read(buf); err != nil {
 				return err
 			}
@@ -82,14 +82,14 @@ func Extract(rs io.Reader, dest string) error {
 		} else if mode&os.ModeType == 0 {
 			log.Debug("unpacking regular file")
 			// save hardlinks until after the taget is written
-			if entry.header.c_nlink > 1 && entry.header.c_filesize == 0 {
+			if entry.Header.c_nlink > 1 && entry.Header.c_filesize == 0 {
 				log.Debug("regular file is a hard link")
-				l, ok := linkMap[entry.header.c_ino]
+				l, ok := linkMap[entry.Header.c_ino]
 				if !ok {
 					l = make([]string, 0)
 				}
 				l = append(l, target)
-				linkMap[entry.header.c_ino] = l
+				linkMap[entry.Header.c_ino] = l
 				continue
 			}
 
@@ -101,8 +101,8 @@ func Extract(rs io.Reader, dest string) error {
 			if err != nil {
 				return err
 			}
-			if written != int64(entry.header.c_filesize) {
-				log.Debugf("written: %d, filesize: %d", written, entry.header.c_filesize)
+			if written != int64(entry.Header.c_filesize) {
+				log.Debugf("written: %d, filesize: %d", written, entry.Header.c_filesize)
 				return fmt.Errorf("short write")
 			}
 			if err := f.Close(); err != nil {
@@ -110,8 +110,8 @@ func Extract(rs io.Reader, dest string) error {
 			}
 
 			// Create hardlinks after the file content is written.
-			if entry.header.c_nlink > 1 && entry.header.c_filesize > 0 {
-				l, ok := linkMap[entry.header.c_ino]
+			if entry.Header.c_nlink > 1 && entry.Header.c_filesize > 0 {
+				l, ok := linkMap[entry.Header.c_ino]
 				if !ok {
 					return fmt.Errorf("hardlinks missing")
 				}
@@ -125,7 +125,7 @@ func Extract(rs io.Reader, dest string) error {
 
 		} else {
 			return fmt.Errorf("unknown file mode 0%o for %s",
-				entry.header.c_mode, entry.filename)
+				entry.Header.c_mode, entry.Header.filename)
 		}
 	}
 

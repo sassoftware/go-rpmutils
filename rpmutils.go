@@ -72,9 +72,25 @@ func readSignatureHeader(f io.Reader) (*rpmHeader, error) {
 	return readHeader(f, "", isSource, true)
 }
 
+func (hdr *RpmHeader) HasTag(tag int) bool {
+	h, t := hdr.getHeader(tag)
+	return h.HasTag(t)
+}
+
 func (hdr *RpmHeader) Get(tag int) (interface{}, error) {
 	h, t := hdr.getHeader(tag)
 	return h.Get(t)
+}
+
+func (hdr *RpmHeader) GetString(tag int) (string, error) {
+	vals, err := hdr.GetStrings(tag)
+	if err != nil {
+		return "", err
+	}
+	if len(vals) != 1 {
+		return "", fmt.Errorf("incorrect number of values")
+	}
+	return vals[0], nil
 }
 
 func (hdr *RpmHeader) GetStrings(tag int) ([]string, error) {

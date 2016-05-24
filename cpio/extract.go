@@ -24,7 +24,7 @@ import (
 	"syscall"
 )
 
-func Extract(rs io.ReadSeeker, dest string) error {
+func Extract(rs io.Reader, dest string) error {
 	linkMap := make(map[int][]string)
 
 	stream := NewCpioStream(rs)

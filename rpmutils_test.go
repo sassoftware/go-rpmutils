@@ -17,6 +17,7 @@
 package rpmutils
 
 import (
+	"io/ioutil"
 	"os"
 	"testing"
 )
@@ -53,5 +54,58 @@ func TestReadHeader(t *testing.T) {
 
 	if len(files) != 3 {
 		t.Fatalf("incorrect number of files %d", len(files))
+	}
+}
+
+func TestPayloadReader(t *testing.T) {
+	SetupLogging(os.Stderr, os.Stderr, true, true)
+	f, err := os.Open("./testdata/simple-1.0.1-1.i386.rpm")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rpm, err := ReadRpm(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pldr, err := rpm.PayloadReader()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	hdr, err := pldr.Next()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if hdr.Filesize() != 7 {
+		t.Fatalf("wrong file size %d", hdr.Filesize())
+	}
+
+	if hdr.Filename() != "./config" {
+		t.Fatalf("wrong file name %s", hdr.Filename())
+	}
+}
+
+func TestExpandPayload(t *testing.T) {
+	f, err := os.Open("./testdata/simple-1.0.1-1.i386.rpm")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rpm, err := ReadRpm(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tmpdir, err := ioutil.TempDir("", "rpmutil")
+	if err != nil {
+		t.Fatal(err)
+	}
+	log.Debugf("using destdir: %s", tmpdir)
+
+	if err := rpm.ExpandPayload(tmpdir); err != nil {
+		t.Fatal(err)
 	}
 }

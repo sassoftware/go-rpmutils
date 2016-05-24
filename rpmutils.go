@@ -20,12 +20,46 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+
+	"gerrit-pdt.unx.sas.com/dt/rpmutils.git/cpio"
 )
+
+type Rpm struct {
+	Header *RpmHeader
+	f      io.Reader
+}
 
 type RpmHeader struct {
 	sigHeader *rpmHeader
 	genHeader *rpmHeader
 	isSource  bool
+}
+
+func ReadRpm(f io.Reader) (*Rpm, error) {
+	hdr, err := ReadHeader(f)
+	if err != nil {
+		return nil, err
+	}
+	return &Rpm{
+		Header: hdr,
+		f:      f,
+	}, nil
+}
+
+func (rpm *Rpm) ExpandPayload(dest string) error {
+	pld, err := uncompressRpmPayloadReader(rpm.f, rpm.Header)
+	if err != nil {
+		return err
+	}
+	return cpio.Extract(pld, dest)
+}
+
+func (rpm *Rpm) PayloadReader() (*cpio.Reader, error) {
+	pld, err := uncompressRpmPayloadReader(rpm.f, rpm.Header)
+	if err != nil {
+		return nil, err
+	}
+	return cpio.NewReader(pld), nil
 }
 
 func ReadHeader(f io.Reader) (*RpmHeader, error) {

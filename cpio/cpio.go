@@ -30,31 +30,29 @@ type CpioEntry struct {
 }
 
 type CpioStream struct {
-	stream   io.ReadSeeker
-	curr_pos int64
+	stream   *countingReader
 	next_pos int64
 }
 
-func NewCpioStream(stream io.ReadSeeker) *CpioStream {
+type countingReader struct {
+	stream   io.Reader
+	curr_pos int64
+}
+
+func NewCpioStream(stream io.Reader) *CpioStream {
 	return &CpioStream{
-		stream:   stream,
-		curr_pos: 0,
+		stream: &countingReader{
+			stream:   stream,
+			curr_pos: 0,
+		},
 		next_pos: 0,
 	}
 }
 
 func (cs *CpioStream) ReadNextEntry() (*CpioEntry, error) {
-	// Reset the current possition pointer in case the underlying stream has moved.
-	pos, err := cs.stream.Seek(0, 1)
-	if err != nil {
-		return nil, err
-	}
-	cs.curr_pos = pos
-
-	if cs.next_pos != cs.curr_pos {
-		log.Debugf("seeking %d, curr_pos: %d, next_pos: %d", cs.next_pos-cs.curr_pos, cs.curr_pos, cs.next_pos)
-		n, err := cs.stream.Seek(cs.next_pos-cs.curr_pos, 1)
-		cs.curr_pos += n
+	if cs.next_pos != cs.stream.curr_pos {
+		log.Debugf("seeking %d, curr_pos: %d, next_pos: %d", cs.next_pos-cs.stream.curr_pos, cs.stream.curr_pos, cs.next_pos)
+		_, err := cs.stream.Seek(cs.next_pos-cs.stream.curr_pos, 1)
 		if err != nil {
 			return nil, err
 		}
@@ -90,15 +88,8 @@ func (cs *CpioStream) ReadNextEntry() (*CpioEntry, error) {
 		}
 	}
 
-	// Reset the current possition pointer in case the underlying stream has moved.
-	pos, err = cs.stream.Seek(0, 1)
-	if err != nil {
-		return nil, err
-	}
-	cs.curr_pos = pos
-
 	// Find the next entry
-	cs.next_pos = pad64(cs.curr_pos + int64(hdr.c_filesize))
+	cs.next_pos = pad64(cs.stream.curr_pos + int64(hdr.c_filesize))
 
 	// Find the payload
 	payload, err := newFileStream(cs.stream, int64(hdr.c_filesize))
@@ -114,6 +105,31 @@ func (cs *CpioStream) ReadNextEntry() (*CpioEntry, error) {
 	}
 
 	return &entry, nil
+}
+
+func (cr *countingReader) Read(p []byte) (n int, err error) {
+	n, err = cr.stream.Read(p)
+	cr.curr_pos += int64(n)
+	return
+}
+
+func (cr *countingReader) Seek(offset int64, whence int) (int64, error) {
+	if whence != 1 {
+		return 0, fmt.Errorf("only seeking from current location supported")
+	}
+	if offset == 0 {
+		return cr.curr_pos, nil
+	}
+	log.Debugf("offset: %d, curr_pos: %d", offset, cr.curr_pos)
+	b := make([]byte, offset)
+	n, err := cr.Read(b)
+	if err != nil {
+		return 0, err
+	}
+	if int64(n) != offset {
+		return int64(n), fmt.Errorf("short seek")
+	}
+	return int64(n), nil
 }
 
 func pad(num int) int {

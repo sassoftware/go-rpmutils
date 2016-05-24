@@ -23,7 +23,7 @@ import (
 )
 
 func TestReadHeader(t *testing.T) {
-	//SetupLogging(os.Stderr, os.Stderr, true, true)
+	//setupLogging(os.Stderr, os.Stderr, true, true)
 	f, err := os.Open("./testdata/simple-1.0.1-1.i386.rpm")
 	if err != nil {
 		t.Fatal(err)
@@ -58,7 +58,7 @@ func TestReadHeader(t *testing.T) {
 }
 
 func TestPayloadReader(t *testing.T) {
-	SetupLogging(os.Stderr, os.Stderr, true, true)
+	//setupLogging(os.Stderr, os.Stderr, true, true)
 	f, err := os.Open("./testdata/simple-1.0.1-1.i386.rpm")
 	if err != nil {
 		t.Fatal(err)

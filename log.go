@@ -28,7 +28,7 @@ var _format = logging.MustStringFormatter(
 	`%{color}%{time:15:04:05.000} %{shortfunc} ▶ %{level:.4s} %{id:03x}%{color:reset} %{message}`,
 )
 
-func SetupLogging(cmdOut io.Writer, logFile io.Writer, debug bool, cmddebug bool) {
+func setupLogging(cmdOut io.Writer, logFile io.Writer, debug bool, cmddebug bool) {
 	var cmdLevel, logLevel logging.LeveledBackend
 	if cmdOut != nil {
 		cmdBackend := logging.NewLogBackend(cmdOut, "", 0)

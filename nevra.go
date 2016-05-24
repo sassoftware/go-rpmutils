@@ -16,11 +16,7 @@
 
 package rpmutils
 
-import (
-	"sort"
-
-	"gerrit-pdt.unx.sas.com/dt/gorpmvercmp.git"
-)
+import "sort"
 
 type NEVRA struct {
 	Name    string
@@ -30,14 +26,14 @@ type NEVRA struct {
 	Arch    string
 }
 
-func Vercmp(a NEVRA, b NEVRA) int {
-	if res := gorpmvercmp.Vercmp(a.Epoch, b.Epoch); res != 0 {
+func NEVRAcmp(a NEVRA, b NEVRA) int {
+	if res := Vercmp(a.Epoch, b.Epoch); res != 0 {
 		return res
 	}
-	if res := gorpmvercmp.Vercmp(a.Version, b.Version); res != 0 {
+	if res := Vercmp(a.Version, b.Version); res != 0 {
 		return res
 	}
-	if res := gorpmvercmp.Vercmp(a.Release, b.Release); res != 0 {
+	if res := Vercmp(a.Release, b.Release); res != 0 {
 		return res
 	}
 	return 0
@@ -50,7 +46,7 @@ func (s NEVRASlice) Len() int {
 }
 
 func (s NEVRASlice) Less(i, j int) bool {
-	return Vercmp(s[i], s[j]) == -1
+	return NEVRAcmp(s[i], s[j]) == -1
 }
 
 func (s NEVRASlice) Swap(i, j int) {

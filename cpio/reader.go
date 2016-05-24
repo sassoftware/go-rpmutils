@@ -23,7 +23,7 @@ type Reader struct {
 	cur_ent *CpioEntry
 }
 
-func NewReader(stream io.ReadSeeker) *Reader {
+func NewReader(stream io.Reader) *Reader {
 	return &Reader{
 		stream:  NewCpioStream(stream),
 		cur_ent: nil,

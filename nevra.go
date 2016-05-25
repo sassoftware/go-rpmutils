@@ -16,7 +16,10 @@
 
 package rpmutils
 
-import "sort"
+import (
+	"fmt"
+	"sort"
+)
 
 type NEVRA struct {
 	Name    string
@@ -27,7 +30,7 @@ type NEVRA struct {
 }
 
 func (nevra *NEVRA) String() string {
-	return fmt.Sprintf("%s-%s:%s-%s.%s.rpm", nevra.Name, nevra.Epoch, nevra.Version, nevra.Release, nevra.Archi)
+	return fmt.Sprintf("%s-%s:%s-%s.%s.rpm", nevra.Name, nevra.Epoch, nevra.Version, nevra.Release, nevra.Arch)
 }
 
 func NEVRAcmp(a NEVRA, b NEVRA) int {

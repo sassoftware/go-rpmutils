@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"io"
 
-	"gerrit-pdt.unx.sas.com/dt/go-rpmutils.git/cpio"
+	"github.com/sassoftware/go-rpmutils/cpio"
 )
 
 type Rpm struct {

@@ -26,6 +26,10 @@ type NEVRA struct {
 	Arch    string
 }
 
+func (nevra *NEVRA) String() string {
+	return fmt.Sprintf("%s-%s:%s-%s.%s.rpm", nevra.Name, nevra.Epoch, nevra.Version, nevra.Release, nevra.Archi)
+}
+
 func NEVRAcmp(a NEVRA, b NEVRA) int {
 	if res := Vercmp(a.Epoch, b.Epoch); res != 0 {
 		return res

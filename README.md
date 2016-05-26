@@ -37,6 +37,16 @@ func Main() {
 }
 ```
 
+## Contributing
+
+1. Read contributor agreement
+2. Fork it
+3. Create your feature branch (`git checkout -b my-new-feature`)
+4. Commit your changes (`git commit -am 'Add some feature'`)
+5. Push to the branch (`git push origin my-new-feature`)
+6. Create new Pull Request
+
+
 ## License
 
 go-rpmutils is released under the Apache 2.0 license. See [LICENSE](https://github.com/sassoftware/go-rpmutils/blob/master/LICENSE).

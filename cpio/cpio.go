@@ -24,7 +24,7 @@ import (
 const TRAILER = "TRAILER!!!"
 
 type CpioEntry struct {
-	Header  *cpio_newc_header
+	Header  *Cpio_newc_header
 	payload *file_stream
 }
 

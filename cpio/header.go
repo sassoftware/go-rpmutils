@@ -29,7 +29,7 @@ const cpio_newc_header_length = 110
 
 const cpio_newc_magic = "070701"
 
-type cpio_newc_header struct {
+type Cpio_newc_header struct {
 	c_magic     string
 	c_ino       int
 	c_mode      int
@@ -69,9 +69,9 @@ func (br *binaryReader) Read16(buf *int) error {
 	return nil
 }
 
-func readHeader(r io.Reader) (*cpio_newc_header, error) {
+func readHeader(r io.Reader) (*Cpio_newc_header, error) {
 	log.Debug("reading header")
-	hdr := cpio_newc_header{}
+	hdr := Cpio_newc_header{}
 	br := binaryReader{r: r}
 
 	magic := make([]byte, 6)
@@ -128,66 +128,66 @@ func readHeader(r io.Reader) (*cpio_newc_header, error) {
 	return &hdr, nil
 }
 
-func dumpHeader(hdr *cpio_newc_header) {
+func dumpHeader(hdr *Cpio_newc_header) {
 	log.Debugf("header %v", hdr)
 }
 
-func (hdr *cpio_newc_header) Magic() string {
+func (hdr *Cpio_newc_header) Magic() string {
 	return hdr.c_magic
 }
 
-func (hdr *cpio_newc_header) Ino() int {
+func (hdr *Cpio_newc_header) Ino() int {
 	return hdr.c_ino
 }
 
-func (hdr *cpio_newc_header) Mode() int {
+func (hdr *Cpio_newc_header) Mode() int {
 	return hdr.c_mode
 }
 
-func (hdr *cpio_newc_header) Uid() int {
+func (hdr *Cpio_newc_header) Uid() int {
 	return hdr.c_uid
 }
 
-func (hdr *cpio_newc_header) Gid() int {
+func (hdr *Cpio_newc_header) Gid() int {
 	return hdr.c_gid
 }
 
-func (hdr *cpio_newc_header) Nlink() int {
+func (hdr *Cpio_newc_header) Nlink() int {
 	return hdr.c_nlink
 }
 
-func (hdr *cpio_newc_header) Mtime() int {
+func (hdr *Cpio_newc_header) Mtime() int {
 	return hdr.c_mtime
 }
 
-func (hdr *cpio_newc_header) Filesize() int {
+func (hdr *Cpio_newc_header) Filesize() int {
 	return hdr.c_filesize
 }
 
-func (hdr *cpio_newc_header) Devmajor() int {
+func (hdr *Cpio_newc_header) Devmajor() int {
 	return hdr.c_devmajor
 }
 
-func (hdr *cpio_newc_header) Devminor() int {
+func (hdr *Cpio_newc_header) Devminor() int {
 	return hdr.c_devminor
 }
 
-func (hdr *cpio_newc_header) Rdevmajor() int {
+func (hdr *Cpio_newc_header) Rdevmajor() int {
 	return hdr.c_rdevmajor
 }
 
-func (hdr *cpio_newc_header) Rdevminor() int {
+func (hdr *Cpio_newc_header) Rdevminor() int {
 	return hdr.c_rdevminor
 }
 
-func (hdr *cpio_newc_header) Namesize() int {
+func (hdr *Cpio_newc_header) Namesize() int {
 	return hdr.c_namesize
 }
 
-func (hdr *cpio_newc_header) Check() int {
+func (hdr *Cpio_newc_header) Check() int {
 	return hdr.c_check
 }
 
-func (hdr *cpio_newc_header) Filename() string {
+func (hdr *Cpio_newc_header) Filename() string {
 	return hdr.filename
 }

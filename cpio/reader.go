@@ -30,7 +30,7 @@ func NewReader(stream io.Reader) *Reader {
 	}
 }
 
-func (r *Reader) Next() (*cpio_newc_header, error) {
+func (r *Reader) Next() (*Cpio_newc_header, error) {
 	ent, err := r.stream.ReadNextEntry()
 	if err != nil {
 		return nil, err

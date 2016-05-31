@@ -24,6 +24,20 @@ import (
 	"syscall"
 )
 
+// Standard set of permission bit masks.
+const (
+	S_ISUID  = 04000   // Set uid
+	S_ISGID  = 02000   // Set gid
+	S_ISVTX  = 01000   // Save text (sticky bit)
+	S_ISDIR  = 040000  // Directory
+	S_ISFIFO = 010000  // FIFO
+	S_ISREG  = 0100000 // Regular file
+	S_ISLNK  = 0120000 // Symbolic link
+	S_ISBLK  = 060000  // Block special file
+	S_ISCHR  = 020000  // Character special file
+	S_ISSOCK = 0140000 // Socket
+)
+
 func Extract(rs io.Reader, dest string) error {
 	linkMap := make(map[int][]string)
 
@@ -51,26 +65,27 @@ func Extract(rs io.Reader, dest string) error {
 
 		// FIXME: Need a makedev implementation in go.
 
-		mode := os.FileMode(entry.Header.c_mode)
-		if mode&os.ModeCharDevice != 0 {
+		switch entry.Header.Mode() &^ 07777 {
+		case S_ISCHR:
 			log.Debug("unpacking char device")
 			// FIXME: skipping due to lack of makedev.
 			continue
-		} else if mode&os.ModeDevice != 0 {
+		case S_ISBLK:
 			log.Debug("unpacking block device")
 			// FIXME: skipping due to lack of makedev.
 			continue
-		} else if mode&os.ModeDir != 0 {
+		case S_ISDIR:
 			log.Debug("unpacking dir")
-			if err := os.Mkdir(target, mode); err != nil {
+			m := os.FileMode(entry.Header.Mode()).Perm()
+			if err := os.Mkdir(target, m); err != nil {
 				return err
 			}
-		} else if mode&os.ModeNamedPipe != 0 {
+		case S_ISFIFO:
 			log.Debug("unpacking named pipe")
-			if err := syscall.Mkfifo(target, uint32(mode)); err != nil {
+			if err := syscall.Mkfifo(target, uint32(entry.Header.Mode())); err != nil {
 				return err
 			}
-		} else if mode&os.ModeSymlink != 0 {
+		case S_ISLNK:
 			log.Debug("unpacking symlink")
 			buf := make([]byte, entry.Header.c_filesize)
 			if _, err := entry.payload.Read(buf); err != nil {
@@ -79,7 +94,7 @@ func Extract(rs io.Reader, dest string) error {
 			if err := os.Symlink(string(buf), target); err != nil {
 				return err
 			}
-		} else if mode&os.ModeType == 0 {
+		case S_ISREG:
 			log.Debug("unpacking regular file")
 			// save hardlinks until after the taget is written
 			if entry.Header.c_nlink > 1 && entry.Header.c_filesize == 0 {
@@ -93,6 +108,7 @@ func Extract(rs io.Reader, dest string) error {
 				continue
 			}
 
+			// FIXME: Set permissions on files when creating.
 			f, err := os.Create(target)
 			if err != nil {
 				return err
@@ -122,8 +138,7 @@ func Extract(rs io.Reader, dest string) error {
 					}
 				}
 			}
-
-		} else {
+		default:
 			return fmt.Errorf("unknown file mode 0%o for %s",
 				entry.Header.c_mode, entry.Header.filename)
 		}

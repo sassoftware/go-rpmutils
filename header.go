@@ -293,6 +293,18 @@ func (hdr *rpmHeader) GetFiles() ([]FileInfo, error) {
 	if err != nil {
 		return nil, err
 	}
+	fileMtimes, err := hdr.GetInts(FILEMTIMES)
+	if err != nil {
+		return nil, err
+	}
+	fileDigests, err := hdr.GetStrings(FILEDIGESTS)
+	if err != nil {
+		return nil, err
+	}
+	fileModes, err := hdr.GetInts(FILEMODES)
+	if err != nil {
+		return nil, err
+	}
 
 	files := make([]FileInfo, len(paths))
 	for i := 0; i < len(paths); i++ {
@@ -302,6 +314,9 @@ func (hdr *rpmHeader) GetFiles() ([]FileInfo, error) {
 			userName:  fileUserName[i],
 			groupName: fileGroupName[i],
 			flags:     fileFlags[i],
+			mtime:     fileMtimes[i],
+			digest:    fileDigests[i],
+			mode:      fileModes[i],
 		}
 	}
 

@@ -22,6 +22,9 @@ type FileInfo interface {
 	UserName() string
 	GroupName() string
 	Flags() int
+	Mtime() int
+	Digest() string
+	Mode() int
 }
 
 type fileInfo struct {
@@ -30,6 +33,9 @@ type fileInfo struct {
 	userName  string
 	groupName string
 	flags     int
+	mtime     int
+	digest    string
+	mode      int
 }
 
 func (fi *fileInfo) Name() string {
@@ -50,4 +56,16 @@ func (fi *fileInfo) GroupName() string {
 
 func (fi *fileInfo) Flags() int {
 	return fi.flags
+}
+
+func (fi *fileInfo) Mtime() int {
+	return fi.mtime
+}
+
+func (fi *fileInfo) Digest() string {
+	return fi.digest
+}
+
+func (fi *fileInfo) Mode() int {
+	return fi.mode
 }

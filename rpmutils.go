@@ -84,13 +84,9 @@ func ReadHeader(f io.Reader) (*RpmHeader, error) {
 
 func readSignatureHeader(f io.Reader) (*rpmHeader, error) {
 	// Read signature header
-	lead := make([]byte, 96)
-	s, err := f.Read(lead)
-	if s != 96 {
-		return nil, fmt.Errorf("short sig header, got %d bytes, expected 96", s)
-	}
+	lead, err := readExact(f, 96)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error reading RPM lead: %s", err.Error())
 	}
 
 	// Check file magic

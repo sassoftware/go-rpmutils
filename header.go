@@ -20,61 +20,84 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"path"
+	"sort"
+	"strings"
 )
 
+const introMagic = 0x8eade801
+
 type entry struct {
-	dataType, offset, count int
+	dataType, count int32
+	contents        []byte
 }
 
 type rpmHeader struct {
 	entries  map[int]entry
-	data     []byte
 	isSource bool
+	origSize int
+}
+
+type headerIntro struct {
+	Magic, Reserved, Entries, Size uint32
+}
+
+type headerTag struct {
+	Tag, DataType, Offset, Count int32
+}
+
+var typeAlign = map[int32]int{
+	RPM_INT16_TYPE: 2,
+	RPM_INT32_TYPE: 4,
+	RPM_INT64_TYPE: 8,
+}
+
+var typeSizes = map[int32]int{
+	RPM_NULL_TYPE:  0,
+	RPM_CHAR_TYPE:  1,
+	RPM_INT8_TYPE:  1,
+	RPM_INT16_TYPE: 2,
+	RPM_INT32_TYPE: 4,
+	RPM_INT64_TYPE: 8,
+	RPM_BIN_TYPE:   1,
+}
+
+func readExact(f io.Reader, n int) ([]byte, error) {
+	buf := make([]byte, n)
+	_, err := io.ReadFull(f, buf)
+	return buf, err
 }
 
 func readHeader(f io.Reader, hash string, isSource bool, sigBlock bool) (*rpmHeader, error) {
-	intro := make([]byte, 16)
-	s, err := f.Read(intro)
-	if s != 16 {
-		return nil, fmt.Errorf("short intro, got %d bytes, expected 16", s)
+	var intro headerIntro
+	if err := binary.Read(f, binary.BigEndian, &intro); err != nil {
+		return nil, fmt.Errorf("error reading RPM header: %s", err.Error())
 	}
-	if err != nil {
-		return nil, err
-	}
-
-	if intro[0] != 0x8e || intro[1] != 0xad || intro[2] != 0xe8 || intro[3] != 01 {
+	if intro.Magic != introMagic {
 		return nil, fmt.Errorf("bad magic for header")
 	}
-
-	//reserved := binary.BigEndian.Uint32(intro[4:8])
-	entries := binary.BigEndian.Uint32(intro[8:12])
-	size := binary.BigEndian.Uint32(intro[12:16])
-
-	entryTable := make([]byte, entries*16)
-	s, err = f.Read(entryTable)
-	if s != int(entries)*16 {
-		return nil, fmt.Errorf("short read on entry table")
-	}
+	entryTable, err := readExact(f, int(intro.Entries*16))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error reading RPM header table: %s", err.Error())
 	}
 
-	data := make([]byte, size)
-	s, err = f.Read(data)
-	if s != int(size) {
-		return nil, fmt.Errorf("short read on data")
+	size := intro.Size
+	if sigBlock {
+		// signature block is padded to 8 byte alignment
+		size = (size + 7) / 8 * 8
 	}
+	data, err := readExact(f, int(size))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error reading RPM header data: %s", err.Error())
 	}
 
 	// Check sha1 if it was specified
 	if len(hash) > 1 {
 		h := sha1.New()
-		h.Write(intro)
+		binary.Write(h, binary.BigEndian, &intro)
 		h.Write(entryTable)
 		h.Write(data)
 		if fmt.Sprintf("%x", h.Sum(nil)) != hash {
@@ -84,43 +107,37 @@ func readHeader(f io.Reader, hash string, isSource bool, sigBlock bool) (*rpmHea
 
 	ents := make(map[int]entry)
 	buf := bytes.NewReader(entryTable)
-	var tag, dataType, offset, count int32
-	for i := 0; i < int(entries); i++ {
+	for i := 0; i < int(intro.Entries); i++ {
+		var tag headerTag
 		if err := binary.Read(buf, binary.BigEndian, &tag); err != nil {
 			return nil, err
 		}
-		if err := binary.Read(buf, binary.BigEndian, &dataType); err != nil {
-			return nil, err
+		typeSize, ok := typeSizes[tag.DataType]
+		var end int
+		if ok {
+			end = int(tag.Offset) + typeSize*int(tag.Count)
+		} else {
+			// String types are null-terminated
+			end = int(tag.Offset)
+			for i := 0; i < int(tag.Count); i++ {
+				next := bytes.IndexByte(data[end:], 0)
+				if next < 0 {
+					return nil, fmt.Errorf("tag %d is truncated", tag.Tag)
+				}
+				end += next + 1
+			}
 		}
-		if err := binary.Read(buf, binary.BigEndian, &offset); err != nil {
-			return nil, err
-		}
-		if err := binary.Read(buf, binary.BigEndian, &count); err != nil {
-			return nil, err
-		}
-
-		ents[int(tag)] = entry{
-			dataType: int(dataType),
-			offset:   int(offset),
-			count:    int(count),
-		}
-	}
-
-	if sigBlock {
-		// We need to align to an 8-byte boundary.
-		// So far we read the intro (which is 16 bytes) and the entry table
-		// (which is a multiple of 16 bytes). So we only have to worry about
-		// the actual header data not being aligned.
-		alignement := size % 8
-		if alignement > 0 {
-			f.Read(make([]byte, 8-alignement))
+		ents[int(tag.Tag)] = entry{
+			dataType: tag.DataType,
+			count:    tag.Count,
+			contents: data[tag.Offset:end],
 		}
 	}
 
 	return &rpmHeader{
 		entries:  ents,
-		data:     data,
 		isSource: isSource,
+		origSize: 16 + len(entryTable) + len(data),
 	}, nil
 }
 
@@ -138,11 +155,11 @@ func (hdr *rpmHeader) Get(tag int) (interface{}, error) {
 		return nil, NewNoSuchTagError(tag)
 	}
 	switch ent.dataType {
-	case 6, 8, 9:
+	case RPM_STRING_TYPE, RPM_STRING_ARRAY_TYPE, RPM_I18NSTRING_TYPE:
 		return hdr.GetStrings(tag)
-	case 2, 3, 4:
+	case RPM_INT8_TYPE, RPM_INT16_TYPE, RPM_INT32_TYPE:
 		return hdr.GetInts(tag)
-	case 1, 7:
+	case RPM_CHAR_TYPE, RPM_BIN_TYPE:
 		return hdr.GetBytes(tag)
 	default:
 		return nil, fmt.Errorf("unsupported data type")
@@ -174,24 +191,11 @@ func (hdr *rpmHeader) GetStrings(tag int) ([]string, error) {
 	if !ok {
 		return nil, NewNoSuchTagError(tag)
 	}
-	// RPM_STRING_TYPE, RPM_STRING_ARRAY_TYPE, RPM_I18STRING_TYPE
-	if ent.dataType != 6 && ent.dataType != 8 && ent.dataType != 9 {
+	if ent.dataType != RPM_STRING_TYPE && ent.dataType != RPM_STRING_ARRAY_TYPE && ent.dataType != RPM_I18NSTRING_TYPE {
 		return nil, fmt.Errorf("unsupported datatype for string: %d, tag: %d", ent.dataType, tag)
 	}
-
-	offset := ent.offset
-	out := make([]string, ent.count)
-	for i := 0; i < ent.count; i++ {
-		s := make([]byte, 0, 0)
-		for hdr.data[offset] != 0x0 {
-			s = append(s, hdr.data[offset])
-			offset += 1
-		}
-		out[i] = string(s)
-		offset += 1
-	}
-
-	return out, nil
+	strs := strings.Split(string(ent.contents), "\x00")
+	return strs[:ent.count], nil
 }
 
 func (hdr *rpmHeader) GetInts(tag int) ([]int, error) {
@@ -199,26 +203,19 @@ func (hdr *rpmHeader) GetInts(tag int) ([]int, error) {
 	if !ok {
 		return nil, NewNoSuchTagError(tag)
 	}
-	if ent.dataType != 2 && ent.dataType != 3 && ent.dataType != 4 {
-		return nil, fmt.Errorf("unsupported datatype for int: %d, tag %d", ent.dataType, tag)
-	}
-
-	offset := ent.offset
 	out := make([]int, ent.count)
-	for i := 0; i < ent.count; i++ {
+	content := ent.contents
+	for i := int32(0); i < ent.count; i++ {
 		switch ent.dataType {
-		case 2:
-			// RPM_INT8_TYPE
-			out[i] = int(hdr.data[offset])
-			offset += 1
-		case 3:
-			// RPM_INT16_TYPE
-			out[i] = int(binary.BigEndian.Uint16(hdr.data[offset : offset+2]))
-			offset += 2
-		case 4:
-			// RPM_INT32_TYPE
-			out[i] = int(binary.BigEndian.Uint32(hdr.data[offset : offset+4]))
-			offset += 4
+		case RPM_INT8_TYPE:
+			out[i] = int(content[0])
+			content = content[1:]
+		case RPM_INT16_TYPE:
+			out[i] = int(binary.BigEndian.Uint16(content[:2]))
+			content = content[2:]
+		case RPM_INT32_TYPE:
+			out[i] = int(binary.BigEndian.Uint32(content[:4]))
+			content = content[4:]
 		}
 	}
 	return out, nil
@@ -229,11 +226,10 @@ func (hdr *rpmHeader) GetBytes(tag int) ([]byte, error) {
 	if !ok {
 		return nil, NewNoSuchTagError(tag)
 	}
-	// RPM_CHAR_TYPE, RPM_BIN_TYPE
-	if ent.dataType != 1 && ent.dataType != 7 {
+	if ent.dataType != RPM_CHAR_TYPE && ent.dataType != RPM_BIN_TYPE {
 		return nil, fmt.Errorf("unsupported datatype for bytes: %d, tag: %d", ent.dataType, tag)
 	}
-	return hdr.data[ent.offset : ent.offset+ent.count], nil
+	return ent.contents, nil
 }
 
 func (hdr *rpmHeader) GetNEVRA() (*NEVRA, error) {
@@ -321,4 +317,98 @@ func (hdr *rpmHeader) GetFiles() ([]FileInfo, error) {
 	}
 
 	return files, nil
+}
+
+func writeTag(entries io.Writer, blobs *bytes.Buffer, tag int, e entry) error {
+	align, ok := typeAlign[e.dataType]
+	if ok {
+		n := blobs.Len() % align
+		if n != 0 {
+			if _, err := blobs.Write(make([]byte, align-n)); err != nil {
+				return err
+			}
+		}
+	}
+	ht := headerTag{
+		Tag:      int32(tag),
+		DataType: int32(e.dataType),
+		Offset:   int32(blobs.Len()),
+		Count:    int32(e.count),
+	}
+	if err := binary.Write(entries, binary.BigEndian, &ht); err != nil {
+		return err
+	}
+	if _, err := blobs.Write(e.contents); err != nil {
+		return err
+	}
+	return nil
+}
+
+func writeRegion(entries io.Writer, blobs *bytes.Buffer, regionTag int, tagCount int) error {
+	// The data for a region tag is also in the format of a tag, and its offset
+	// points backwards to the first tag that's part of the region. This one
+	// covers the whole header.
+	regionValue := headerTag{
+		Tag:      int32(regionTag),
+		DataType: RPM_BIN_TYPE,
+		Offset:   int32(-16 * (1 + tagCount)),
+		Count:    16,
+	}
+	regionBuf := bytes.NewBuffer(make([]byte, 0, 16))
+	if err := binary.Write(regionBuf, binary.BigEndian, &regionValue); err != nil {
+		return err
+	}
+	regionEntry := entry{dataType: RPM_BIN_TYPE, count: 16, contents: regionBuf.Bytes()}
+	return writeTag(entries, blobs, regionTag, regionEntry)
+}
+
+func (hdr *rpmHeader) WriteTo(outfile io.Writer, regionTag int) error {
+	if regionTag != 0 && regionTag >= RPMTAG_HEADERREGIONS {
+		return errors.New("invalid region tag")
+	}
+	// sort tags
+	var keys []int
+	for k := range hdr.entries {
+		if k < RPMTAG_HEADERREGIONS {
+			// discard existing regions
+			continue
+		}
+		keys = append(keys, k)
+	}
+	sort.Ints(keys)
+	entries := bytes.NewBuffer(make([]byte, 0, 16*len(keys)))
+	blobs := bytes.NewBuffer(make([]byte, 0, hdr.origSize))
+	for _, k := range keys {
+		if k == regionTag {
+			continue
+		}
+		if err := writeTag(entries, blobs, k, hdr.entries[k]); err != nil {
+			return err
+		}
+	}
+	intro := headerIntro{
+		Magic:    introMagic,
+		Reserved: 0,
+		Entries:  uint32(len(keys) + 1),
+		Size:     uint32(blobs.Len() + 16),
+	}
+	if err := binary.Write(outfile, binary.BigEndian, &intro); err != nil {
+		return err
+	}
+	if err := writeRegion(outfile, blobs, regionTag, len(keys)); err != nil {
+		return err
+	}
+	if _, err := io.Copy(outfile, entries); err != nil {
+		return err
+	}
+	if _, err := io.Copy(outfile, blobs); err != nil {
+		return err
+	}
+	if regionTag == RPMTAG_HEADERSIGNATURES {
+		alignment := blobs.Len() % 8
+		if alignment != 0 {
+			outfile.Write(make([]byte, 8-alignment))
+		}
+	}
+	return nil
 }

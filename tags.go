@@ -17,6 +17,17 @@
 package rpmutils
 
 const (
+	RPM_NULL_TYPE         = 0
+	RPM_CHAR_TYPE         = 1
+	RPM_INT8_TYPE         = 2
+	RPM_INT16_TYPE        = 3
+	RPM_INT32_TYPE        = 4
+	RPM_INT64_TYPE        = 5
+	RPM_STRING_TYPE       = 6
+	RPM_BIN_TYPE          = 7
+	RPM_STRING_ARRAY_TYPE = 8
+	RPM_I18NSTRING_TYPE   = 9
+
 	_GENERAL_TAG_BASE = 1000
 	NAME              = 1000
 	VERSION           = 1001
@@ -82,14 +93,18 @@ const (
 	TRIGGERPREIN = 1170
 
 	SIG_BASE = 256
-	SIG_SHA1 = 269
+	SIG_DSA  = SIG_BASE + 11
+	SIG_RSA  = SIG_BASE + 12
+	SIG_SHA1 = SIG_BASE + 13
 
 	// Given that there is overlap between signature tag headers and general tag
 	// headers, we offset the signature ones by some amount
 	_SIGHEADER_TAG_BASE = 16384
 	SIG_SIZE            = _SIGHEADER_TAG_BASE + 1000 // Header + Payload size
+	SIG_PGP             = _SIGHEADER_TAG_BASE + 1002
 	SIG_MD5             = _SIGHEADER_TAG_BASE + 1004 // MD5SUM of header + payload
 	SIG_GPG             = _SIGHEADER_TAG_BASE + 1005
+	SIG_RESERVEDSPACE   = _SIGHEADER_TAG_BASE + 1008
 
 	// FILEFLAGS bitmask elements:
 	RPMFILE_NONE      = 0
@@ -131,4 +146,9 @@ const (
 	RPMSENSE_TRIGGERUN     = 1 << 17
 	RPMSENSE_TRIGGERPOSTUN = 1 << 18
 	RPMSENSE_TRIGGERPREIN  = 1 << 25
+
+	// Header region tags
+	RPMTAG_HEADERSIGNATURES = 62
+	RPMTAG_HEADERIMMUTABLE  = 63
+	RPMTAG_HEADERREGIONS    = 64
 )

@@ -122,7 +122,7 @@ func (cr *countingReader) Seek(offset int64, whence int) (int64, error) {
 	log.Debugf("offset: %d, curr_pos: %d", offset, cr.curr_pos)
 	b := make([]byte, offset)
 	n, err := cr.Read(b)
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return 0, err
 	}
 	if int64(n) != offset {

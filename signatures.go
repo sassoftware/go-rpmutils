@@ -26,6 +26,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"syscall"
 	"time"
 
 	"golang.org/x/crypto/openpgp/packet"
@@ -142,8 +143,22 @@ func SignRpmStream(stream io.Reader, key *packet.PrivateKey, opts *SignatureOpti
 	}, nil
 }
 
-func SignRpmFile(infile *os.File, outpath string, key *packet.PrivateKey, opts *SignatureOptions) (err error) {
-	header, err := SignRpmStream(infile, key, opts)
+func canOverwrite(ininfo, outinfo os.FileInfo) bool {
+	if !outinfo.Mode().IsRegular() {
+		return false
+	}
+	if !os.SameFile(ininfo, outinfo) {
+		return false
+	}
+	stat := outinfo.Sys().(*syscall.Stat_t)
+	if stat.Nlink != 1 {
+		return false
+	}
+	return true
+}
+
+func SignRpmFile(infile *os.File, outpath string, key *packet.PrivateKey, opts *SignatureOptions) (header *RpmHeader, err error) {
+	header, err = SignRpmStream(infile, key, opts)
 	if err != nil {
 		return
 	}
@@ -157,19 +172,17 @@ func SignRpmFile(infile *os.File, outpath string, key *packet.PrivateKey, opts *
 		outstream = os.Stdout
 	} else {
 		outinfo, err := os.Lstat(outpath)
-		if err == nil && outinfo.Mode().IsRegular() && os.SameFile(ininfo, outinfo) {
+		if err == nil && canOverwrite(ininfo, outinfo) {
 			ok, err := writeInPlace(outpath, header.sigHeader)
 			if err != nil || ok {
-				return err
-			} else if ok {
-				return nil
+				return header, err
 			}
 			// in-place didn't work; fallback to rewrite
 		} else if err == nil && !outinfo.Mode().IsRegular() {
 			// pipe or something else. open for writing.
 			outfile, err := os.Create(outpath)
 			if err != nil {
-				return err
+				return header, err
 			}
 			defer outfile.Close()
 			outstream = outfile
@@ -178,7 +191,7 @@ func SignRpmFile(infile *os.File, outpath string, key *packet.PrivateKey, opts *
 			// write-rename
 			tempfile, err := ioutil.TempFile(path.Dir(outpath), path.Base(outpath))
 			if err != nil {
-				return err
+				return header, err
 			}
 			defer func() {
 				if err != nil {
@@ -192,7 +205,8 @@ func SignRpmFile(infile *os.File, outpath string, key *packet.PrivateKey, opts *
 			outstream = tempfile
 		}
 	}
-	return writeRpm(infile, outstream, header.sigHeader)
+	err = writeRpm(infile, outstream, header.sigHeader)
+	return
 }
 
 func writeRpm(infile io.ReadSeeker, outstream io.Writer, sigHeader *rpmHeader) error {

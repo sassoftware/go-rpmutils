@@ -26,9 +26,9 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
-	"syscall"
 	"time"
 
+	"github.com/sassoftware/go-rpmutils/fileutil"
 	"golang.org/x/crypto/openpgp/packet"
 )
 
@@ -150,8 +150,7 @@ func canOverwrite(ininfo, outinfo os.FileInfo) bool {
 	if !os.SameFile(ininfo, outinfo) {
 		return false
 	}
-	stat := outinfo.Sys().(*syscall.Stat_t)
-	if stat.Nlink != 1 {
+	if fileutil.HasLinks(outinfo) {
 		return false
 	}
 	return true

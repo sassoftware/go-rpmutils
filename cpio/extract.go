@@ -21,7 +21,8 @@ import (
 	"io"
 	"os"
 	"path"
-	"syscall"
+
+	"github.com/sassoftware/go-rpmutils/fileutil"
 )
 
 // Standard set of permission bit masks.
@@ -82,7 +83,7 @@ func Extract(rs io.Reader, dest string) error {
 			}
 		case S_ISFIFO:
 			log.Debug("unpacking named pipe")
-			if err := syscall.Mkfifo(target, uint32(entry.Header.Mode())); err != nil {
+			if err := fileutil.Mkfifo(target, uint32(entry.Header.Mode())); err != nil {
 				return err
 			}
 		case S_ISLNK:

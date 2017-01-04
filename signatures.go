@@ -87,6 +87,13 @@ func insertSignature(sigHeader *rpmHeader, tag int, value []byte) {
 	}
 }
 
+func insertSignatures(sigHeader *rpmHeader, sigPgp, sigRsa []byte) {
+	insertSignature(sigHeader, SIG_PGP-_SIGHEADER_TAG_BASE, sigPgp)
+	insertSignature(sigHeader, SIG_RSA, sigRsa)
+	delete(sigHeader.entries, SIG_GPG-_SIGHEADER_TAG_BASE)
+	delete(sigHeader.entries, SIG_DSA)
+}
+
 func getSha1(sigHeader *rpmHeader) string {
 	vals, err := sigHeader.GetStrings(SIG_SHA1)
 	if err != nil {
@@ -132,10 +139,7 @@ func SignRpmStream(stream io.Reader, key *packet.PrivateKey, opts *SignatureOpti
 	if err != nil {
 		return
 	}
-	insertSignature(sigHeader, SIG_PGP-_SIGHEADER_TAG_BASE, sigPgp)
-	insertSignature(sigHeader, SIG_RSA, sigRsa)
-	delete(sigHeader.entries, SIG_GPG-_SIGHEADER_TAG_BASE)
-	delete(sigHeader.entries, SIG_DSA)
+	insertSignatures(sigHeader, sigPgp, sigRsa)
 	return &RpmHeader{
 		sigHeader: sigHeader,
 		genHeader: genHeader,
@@ -161,10 +165,27 @@ func SignRpmFile(infile *os.File, outpath string, key *packet.PrivateKey, opts *
 	if err != nil {
 		return
 	}
+	return header, rewriteRpm(infile, outpath, header)
+}
+
+func RewriteWithSignatures(infile *os.File, outpath string, sigPgp, sigRsa []byte) (*RpmHeader, error) {
+	header, err := ReadHeader(infile)
+	if err != nil {
+		return nil, err
+	}
+	insertSignatures(header.sigHeader, sigPgp, sigRsa)
+	err = rewriteRpm(infile, outpath, header)
+	if err != nil {
+		return nil, err
+	}
+	return header, nil
+}
+
+func rewriteRpm(infile *os.File, outpath string, header *RpmHeader) error {
 	delete(header.sigHeader.entries, SIG_RESERVEDSPACE-_SIGHEADER_TAG_BASE)
 	ininfo, err := infile.Stat()
 	if err != nil {
-		return
+		return err
 	}
 	var outstream io.Writer
 	if outpath == "-" {
@@ -174,14 +195,14 @@ func SignRpmFile(infile *os.File, outpath string, key *packet.PrivateKey, opts *
 		if err == nil && canOverwrite(ininfo, outinfo) {
 			ok, err := writeInPlace(outpath, header.sigHeader)
 			if err != nil || ok {
-				return header, err
+				return err
 			}
 			// in-place didn't work; fallback to rewrite
 		} else if err == nil && !outinfo.Mode().IsRegular() {
 			// pipe or something else. open for writing.
 			outfile, err := os.Create(outpath)
 			if err != nil {
-				return header, err
+				return err
 			}
 			defer outfile.Close()
 			outstream = outfile
@@ -190,7 +211,7 @@ func SignRpmFile(infile *os.File, outpath string, key *packet.PrivateKey, opts *
 			// write-rename
 			tempfile, err := ioutil.TempFile(path.Dir(outpath), path.Base(outpath))
 			if err != nil {
-				return header, err
+				return err
 			}
 			defer func() {
 				if err != nil {
@@ -204,8 +225,7 @@ func SignRpmFile(infile *os.File, outpath string, key *packet.PrivateKey, opts *
 			outstream = tempfile
 		}
 	}
-	err = writeRpm(infile, outstream, header.sigHeader)
-	return
+	return writeRpm(infile, outstream, header.sigHeader)
 }
 
 func writeRpm(infile io.ReadSeeker, outstream io.Writer, sigHeader *rpmHeader) error {

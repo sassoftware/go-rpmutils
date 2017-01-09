@@ -30,6 +30,7 @@ type Rpm struct {
 }
 
 type RpmHeader struct {
+	lead      []byte
 	sigHeader *rpmHeader
 	genHeader *rpmHeader
 	isSource  bool
@@ -63,7 +64,7 @@ func (rpm *Rpm) PayloadReader() (*cpio.Reader, error) {
 }
 
 func ReadHeader(f io.Reader) (*RpmHeader, error) {
-	sigHeader, err := readSignatureHeader(f)
+	lead, sigHeader, err := readSignatureHeader(f)
 	if err != nil {
 		return nil, err
 	}
@@ -76,30 +77,32 @@ func ReadHeader(f io.Reader) (*RpmHeader, error) {
 	}
 
 	return &RpmHeader{
+		lead:      lead,
 		sigHeader: sigHeader,
 		genHeader: genHeader,
 		isSource:  sigHeader.isSource,
 	}, nil
 }
 
-func readSignatureHeader(f io.Reader) (*rpmHeader, error) {
+func readSignatureHeader(f io.Reader) ([]byte, *rpmHeader, error) {
 	// Read signature header
 	lead, err := readExact(f, 96)
 	if err != nil {
-		return nil, fmt.Errorf("error reading RPM lead: %s", err.Error())
+		return nil, nil, fmt.Errorf("error reading RPM lead: %s", err.Error())
 	}
 
 	// Check file magic
 	magic := binary.BigEndian.Uint32(lead[0:4])
 	if magic&0xffffffff != 0xedabeedb {
-		return nil, fmt.Errorf("file is not an RPM")
+		return nil, nil, fmt.Errorf("file is not an RPM")
 	}
 
 	// Check source flag
 	isSource := binary.BigEndian.Uint16(lead[6:8]) == 1
 
 	// Return signature header
-	return readHeader(f, "", isSource, true)
+	hdr, err := readHeader(f, "", isSource, true)
+	return lead, hdr, err
 }
 
 func (hdr *RpmHeader) HasTag(tag int) bool {

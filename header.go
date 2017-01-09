@@ -20,11 +20,9 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"io"
 	"path"
-	"sort"
 	"strings"
 )
 
@@ -317,98 +315,4 @@ func (hdr *rpmHeader) GetFiles() ([]FileInfo, error) {
 	}
 
 	return files, nil
-}
-
-func writeTag(entries io.Writer, blobs *bytes.Buffer, tag int, e entry) error {
-	align, ok := typeAlign[e.dataType]
-	if ok {
-		n := blobs.Len() % align
-		if n != 0 {
-			if _, err := blobs.Write(make([]byte, align-n)); err != nil {
-				return err
-			}
-		}
-	}
-	ht := headerTag{
-		Tag:      int32(tag),
-		DataType: int32(e.dataType),
-		Offset:   int32(blobs.Len()),
-		Count:    int32(e.count),
-	}
-	if err := binary.Write(entries, binary.BigEndian, &ht); err != nil {
-		return err
-	}
-	if _, err := blobs.Write(e.contents); err != nil {
-		return err
-	}
-	return nil
-}
-
-func writeRegion(entries io.Writer, blobs *bytes.Buffer, regionTag int, tagCount int) error {
-	// The data for a region tag is also in the format of a tag, and its offset
-	// points backwards to the first tag that's part of the region. This one
-	// covers the whole header.
-	regionValue := headerTag{
-		Tag:      int32(regionTag),
-		DataType: RPM_BIN_TYPE,
-		Offset:   int32(-16 * (1 + tagCount)),
-		Count:    16,
-	}
-	regionBuf := bytes.NewBuffer(make([]byte, 0, 16))
-	if err := binary.Write(regionBuf, binary.BigEndian, &regionValue); err != nil {
-		return err
-	}
-	regionEntry := entry{dataType: RPM_BIN_TYPE, count: 16, contents: regionBuf.Bytes()}
-	return writeTag(entries, blobs, regionTag, regionEntry)
-}
-
-func (hdr *rpmHeader) WriteTo(outfile io.Writer, regionTag int) error {
-	if regionTag != 0 && regionTag >= RPMTAG_HEADERREGIONS {
-		return errors.New("invalid region tag")
-	}
-	// sort tags
-	var keys []int
-	for k := range hdr.entries {
-		if k < RPMTAG_HEADERREGIONS {
-			// discard existing regions
-			continue
-		}
-		keys = append(keys, k)
-	}
-	sort.Ints(keys)
-	entries := bytes.NewBuffer(make([]byte, 0, 16*len(keys)))
-	blobs := bytes.NewBuffer(make([]byte, 0, hdr.origSize))
-	for _, k := range keys {
-		if k == regionTag {
-			continue
-		}
-		if err := writeTag(entries, blobs, k, hdr.entries[k]); err != nil {
-			return err
-		}
-	}
-	intro := headerIntro{
-		Magic:    introMagic,
-		Reserved: 0,
-		Entries:  uint32(len(keys) + 1),
-		Size:     uint32(blobs.Len() + 16),
-	}
-	if err := binary.Write(outfile, binary.BigEndian, &intro); err != nil {
-		return err
-	}
-	if err := writeRegion(outfile, blobs, regionTag, len(keys)); err != nil {
-		return err
-	}
-	if _, err := io.Copy(outfile, entries); err != nil {
-		return err
-	}
-	if _, err := io.Copy(outfile, blobs); err != nil {
-		return err
-	}
-	if regionTag == RPMTAG_HEADERSIGNATURES {
-		alignment := blobs.Len() % 8
-		if alignment != 0 {
-			outfile.Write(make([]byte, 8-alignment))
-		}
-	}
-	return nil
 }

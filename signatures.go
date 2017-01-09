@@ -112,7 +112,7 @@ func checkMd5(sigHeader *rpmHeader, h hash.Hash) bool {
 
 // Read an RPM and sign it, returning the set of headers updated with the new signature.
 func SignRpmStream(stream io.Reader, key *packet.PrivateKey, opts *SignatureOptions) (header *RpmHeader, err error) {
-	sigHeader, err := readSignatureHeader(stream)
+	lead, sigHeader, err := readSignatureHeader(stream)
 	if err != nil {
 		return
 	}
@@ -141,6 +141,7 @@ func SignRpmStream(stream io.Reader, key *packet.PrivateKey, opts *SignatureOpti
 	}
 	insertSignatures(sigHeader, sigPgp, sigRsa)
 	return &RpmHeader{
+		lead:      lead,
 		sigHeader: sigHeader,
 		genHeader: genHeader,
 		isSource:  sigHeader.isSource,
@@ -193,7 +194,7 @@ func rewriteRpm(infile *os.File, outpath string, header *RpmHeader) error {
 	} else {
 		outinfo, err := os.Lstat(outpath)
 		if err == nil && canOverwrite(ininfo, outinfo) {
-			ok, err := writeInPlace(outpath, header.sigHeader)
+			ok, err := writeInPlace(outpath, header)
 			if err != nil || ok {
 				return err
 			}
@@ -228,6 +229,30 @@ func rewriteRpm(infile *os.File, outpath string, header *RpmHeader) error {
 	return writeRpm(infile, outstream, header.sigHeader)
 }
 
+func writeInPlace(path string, header *RpmHeader) (ok bool, err error) {
+	blob, err := header.DumpSignatureHeader(true)
+	if err != nil {
+		return false, err
+	}
+	orig := header.OriginalSignatureHeaderSize()
+	if orig != len(blob) {
+		// size changed; can't rewrite in place
+		return false, nil
+	}
+	outfile, err := os.OpenFile(path, os.O_RDWR, 0)
+	if err != nil {
+		return
+	}
+	defer outfile.Close()
+	n, err := outfile.Write(blob)
+	if err != nil {
+		return false, err
+	} else if n != len(blob) {
+		return false, errors.New("short write")
+	}
+	return true, nil
+}
+
 func writeRpm(infile io.ReadSeeker, outstream io.Writer, sigHeader *rpmHeader) error {
 	if _, err := infile.Seek(0, 0); err != nil {
 		return err
@@ -245,53 +270,4 @@ func writeRpm(infile io.ReadSeeker, outstream io.Writer, sigHeader *rpmHeader) e
 	}
 	_, err = io.Copy(outstream, infile)
 	return err
-}
-
-type byteCountSink int
-
-func (sink *byteCountSink) Write(data []byte) (int, error) {
-	*sink += byteCountSink(len(data))
-	return len(data), nil
-}
-
-func writeInPlace(path string, sigHeader *rpmHeader) (ok bool, err error) {
-	var sink byteCountSink
-	err = sigHeader.WriteTo(&sink, RPMTAG_HEADERSIGNATURES)
-	if err != nil {
-		return
-	}
-	needed := int(sink)
-	available := sigHeader.origSize
-	if needed+16 <= available {
-		// Fill unused space with a RESERVEDSPACE tag
-		padding := make([]byte, available-needed-16)
-		sigHeader.entries[SIG_RESERVEDSPACE-_SIGHEADER_TAG_BASE] = entry{
-			dataType: RPM_BIN_TYPE,
-			count:    int32(len(padding)),
-			contents: padding,
-		}
-	} else if needed == available {
-		// Exactly enough space
-	} else {
-		// Not enough space
-		return false, nil
-	}
-	outfile, err := os.OpenFile(path, os.O_RDWR, 0)
-	if err != nil {
-		return
-	}
-	defer outfile.Close()
-	if _, err := outfile.Seek(96, 0); err != nil {
-		return false, err
-	}
-	if err = sigHeader.WriteTo(outfile, RPMTAG_HEADERSIGNATURES); err != nil {
-		return false, err
-	}
-	position, err := outfile.Seek(0, 1)
-	if err != nil {
-		return
-	} else if position != int64(96+sigHeader.origSize) {
-		panic("miscalculation in header rewrite")
-	}
-	return true, nil
 }

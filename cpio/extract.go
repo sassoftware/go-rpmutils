@@ -78,7 +78,7 @@ func Extract(rs io.Reader, dest string) error {
 		case S_ISDIR:
 			log.Debug("unpacking dir")
 			m := os.FileMode(entry.Header.Mode()).Perm()
-			if err := os.Mkdir(target, m); err != nil {
+			if err := os.Mkdir(target, m); err != nil && !os.IsExist(err) {
 				return err
 			}
 		case S_ISFIFO:

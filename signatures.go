@@ -248,7 +248,7 @@ func writeInPlace(path string, header *RpmHeader) (ok bool, err error) {
 	if err != nil {
 		return false, err
 	} else if n != len(blob) {
-		return false, errors.New("short write")
+		return false, io.ErrShortWrite
 	}
 	return true, nil
 }

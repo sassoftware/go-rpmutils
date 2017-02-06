@@ -54,7 +54,7 @@ func Extract(rs io.Reader, dest string) error {
 			break
 		}
 
-		target := path.Join(dest, entry.Header.filename)
+		target := path.Join(dest, path.Clean(entry.Header.filename))
 		parent := path.Dir(target)
 
 		// Create the parent directory if it doesn't exist.

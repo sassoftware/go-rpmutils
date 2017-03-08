@@ -39,4 +39,14 @@ func TestExtract(t *testing.T) {
 	if err := Extract(f, tmpdir); err != nil {
 		t.Fatal(err)
 	}
+
+	log.Debugf("Test second extract on existing directory using destdir: %s", tmpdir)
+
+	if f, err = os.Open("../testdata/foo.cpio"); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Extract(f, tmpdir); err != nil {
+		t.Fatal(err)
+	}
 }

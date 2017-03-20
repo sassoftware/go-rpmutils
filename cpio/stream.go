@@ -65,6 +65,6 @@ func (fs *file_stream) Read(p []byte) (n int, err error) {
 	}
 	n, err = fs.stream.Read(p)
 	fs.curr_pos += int64(n)
-	log.Debugf("read %v", p)
+	//log.Debugf("read %v", p)
 	return
 }

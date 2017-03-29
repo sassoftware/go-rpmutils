@@ -131,6 +131,17 @@ func (hdr *RpmHeader) GetStrings(tag int) ([]string, error) {
 	return h.GetStrings(t)
 }
 
+func (hdr *RpmHeader) GetInt(tag int) (int, error) {
+	vals, err := hdr.GetInts(tag)
+	if err != nil {
+		return -1, err
+	}
+	if len(vals) != 1 {
+		return -1, fmt.Errorf("incorrect number of values")
+	}
+	return vals[0], nil
+}
+
 func (hdr *RpmHeader) GetInts(tag int) ([]int, error) {
 	h, t := hdr.getHeader(tag)
 	return h.GetInts(t)

@@ -299,6 +299,10 @@ func (hdr *rpmHeader) GetFiles() ([]FileInfo, error) {
 	if err != nil {
 		return nil, err
 	}
+	linkTos, err := hdr.GetStrings(FILELINKTOS)
+	if err != nil {
+		return nil, err
+	}
 
 	files := make([]FileInfo, len(paths))
 	for i := 0; i < len(paths); i++ {
@@ -311,6 +315,7 @@ func (hdr *rpmHeader) GetFiles() ([]FileInfo, error) {
 			mtime:     fileMtimes[i],
 			digest:    fileDigests[i],
 			mode:      fileModes[i],
+			linkName:  linkTos[i],
 		}
 	}
 

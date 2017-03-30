@@ -25,6 +25,7 @@ type FileInfo interface {
 	Mtime() int
 	Digest() string
 	Mode() int
+	Linkname() string
 }
 
 type fileInfo struct {
@@ -36,6 +37,7 @@ type fileInfo struct {
 	mtime     int
 	digest    string
 	mode      int
+	linkName  string
 }
 
 func (fi *fileInfo) Name() string {
@@ -68,4 +70,8 @@ func (fi *fileInfo) Digest() string {
 
 func (fi *fileInfo) Mode() int {
 	return fi.mode
+}
+
+func (fi *fileInfo) Linkname() string {
+	return fi.linkName
 }

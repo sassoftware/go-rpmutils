@@ -19,6 +19,7 @@ package cpio
 import (
 	"os"
 	"testing"
+	"testing/iotest"
 )
 
 func TestReadHeader(t *testing.T) {
@@ -27,7 +28,7 @@ func TestReadHeader(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	hdr, err := readHeader(f)
+	hdr, err := readHeader(iotest.HalfReader(f))
 	if err != nil {
 		t.Fatal(err)
 	}

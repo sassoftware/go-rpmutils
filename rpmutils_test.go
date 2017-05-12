@@ -20,6 +20,7 @@ import (
 	"io/ioutil"
 	"os"
 	"testing"
+	"testing/iotest"
 )
 
 func TestReadHeader(t *testing.T) {
@@ -29,7 +30,7 @@ func TestReadHeader(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	hdr, err := ReadHeader(f)
+	hdr, err := ReadHeader(iotest.HalfReader(f))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +65,7 @@ func TestPayloadReader(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rpm, err := ReadRpm(f)
+	rpm, err := ReadRpm(iotest.HalfReader(f))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +95,7 @@ func TestExpandPayload(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rpm, err := ReadRpm(f)
+	rpm, err := ReadRpm(iotest.HalfReader(f))
 	if err != nil {
 		t.Fatal(err)
 	}

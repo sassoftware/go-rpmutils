@@ -75,7 +75,7 @@ func readHeader(r io.Reader) (*Cpio_newc_header, error) {
 	br := binaryReader{r: r}
 
 	magic := make([]byte, 6)
-	if _, err := r.Read(magic); err != nil {
+	if _, err := io.ReadFull(r, magic); err != nil {
 		return nil, err
 	}
 	if string(magic) != cpio_newc_magic {

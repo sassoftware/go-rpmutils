@@ -20,6 +20,7 @@ import (
 	"io/ioutil"
 	"os"
 	"testing"
+	"testing/iotest"
 )
 
 func TestExtract(t *testing.T) {
@@ -36,7 +37,8 @@ func TestExtract(t *testing.T) {
 	}
 	log.Debugf("using destdir: %s", tmpdir)
 
-	if err := Extract(f, tmpdir); err != nil {
+	hf := iotest.HalfReader(f)
+	if err := Extract(hf, tmpdir); err != nil {
 		t.Fatal(err)
 	}
 
@@ -46,7 +48,8 @@ func TestExtract(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := Extract(f, tmpdir); err != nil {
+	hf = iotest.HalfReader(f)
+	if err := Extract(hf, tmpdir); err != nil {
 		t.Fatal(err)
 	}
 }

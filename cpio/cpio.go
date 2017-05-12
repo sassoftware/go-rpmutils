@@ -65,14 +65,8 @@ func (cs *CpioStream) ReadNextEntry() (*CpioEntry, error) {
 
 	// Read filename
 	buf := make([]byte, hdr.c_namesize)
-	n, err := cs.stream.Read(buf)
-	if err != nil {
+	if _, err = io.ReadFull(cs.stream, buf); err != nil {
 		return nil, err
-	}
-	if n != len(buf) {
-		log.Errorf("short read, got %d, expected %d", n, len(buf))
-		log.Debugf("namesize: %d", hdr.c_namesize)
-		return nil, fmt.Errorf("short read")
 	}
 
 	filename := string(buf[:len(buf)-1])
@@ -121,12 +115,9 @@ func (cr *countingReader) Seek(offset int64, whence int) (int64, error) {
 	}
 	log.Debugf("offset: %d, curr_pos: %d", offset, cr.curr_pos)
 	b := make([]byte, offset)
-	n, err := cr.Read(b)
+	n, err := io.ReadFull(cr, b)
 	if err != nil && err != io.EOF {
 		return 0, err
-	}
-	if int64(n) != offset {
-		return int64(n), fmt.Errorf("short seek")
 	}
 	return int64(n), nil
 }

@@ -18,6 +18,7 @@ package rpmutils
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 
@@ -61,6 +62,18 @@ func (rpm *Rpm) PayloadReader() (*cpio.Reader, error) {
 		return nil, err
 	}
 	return cpio.NewReader(pld), nil
+}
+
+func (rpm *Rpm) PayloadReaderExtended() (PayloadReader, error) {
+	pld, err := uncompressRpmPayloadReader(rpm.f, rpm.Header)
+	if err != nil {
+		return nil, err
+	}
+	files, err := rpm.Header.GetFiles()
+	if err != nil {
+		return nil, err
+	}
+	return newPayloadReader(pld, files), nil
 }
 
 func ReadHeader(f io.Reader) (*RpmHeader, error) {
@@ -147,6 +160,22 @@ func (hdr *RpmHeader) GetInts(tag int) ([]int, error) {
 	return h.GetInts(t)
 }
 
+func (hdr *RpmHeader) GetUint64Fallback(intTag, longTag int) (uint64, error) {
+	h, t := hdr.getHeader(longTag)
+	vals, err := h.GetUint64s(t)
+	if err == nil && len(vals) == 1 {
+		return vals[0], nil
+	}
+	h, t = hdr.getHeader(intTag)
+	vals, err = h.GetUint64s(t)
+	if err != nil {
+		return 0, err
+	} else if len(vals) != 1 {
+		return 0, errors.New("incorrect number of values")
+	}
+	return vals[0], nil
+}
+
 func (hdr *RpmHeader) GetBytes(tag int) ([]byte, error) {
 	h, t := hdr.getHeader(tag)
 	return h.GetBytes(t)
@@ -168,4 +197,24 @@ func (hdr *RpmHeader) GetNEVRA() (*NEVRA, error) {
 
 func (hdr *RpmHeader) GetFiles() ([]FileInfo, error) {
 	return hdr.genHeader.GetFiles()
+}
+
+// Return the approximate disk space needed to install the package
+func (hdr *RpmHeader) InstalledSize() (int64, error) {
+	u, err := hdr.GetUint64Fallback(SIZE, LONGSIZE)
+	if err != nil {
+		return -1, err
+	}
+	return int64(u), nil
+}
+
+// Return the size of the uncompressed payload in bytes
+func (hdr *RpmHeader) PayloadSize() (int64, error) {
+	u, err := hdr.sigHeader.GetUint64Fallback(SIG_PAYLOADSIZE-_SIGHEADER_TAG_BASE, SIG_LONGARCHIVESIZE)
+	if err != nil {
+		return -1, err
+	} else if len(u) != 1 {
+		return -1, errors.New("incorrect number of values")
+	}
+	return int64(u[0]), err
 }

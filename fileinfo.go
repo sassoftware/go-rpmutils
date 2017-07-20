@@ -26,18 +26,22 @@ type FileInfo interface {
 	Digest() string
 	Mode() int
 	Linkname() string
+	Device() int
+	Inode() int
 }
 
 type fileInfo struct {
 	name      string
-	size      int64
+	size      uint64
 	userName  string
 	groupName string
-	flags     int
-	mtime     int
+	flags     uint32
+	mtime     uint32
 	digest    string
-	mode      int
+	mode      uint32
 	linkName  string
+	device    uint32
+	inode     uint32
 }
 
 func (fi *fileInfo) Name() string {
@@ -45,7 +49,7 @@ func (fi *fileInfo) Name() string {
 }
 
 func (fi *fileInfo) Size() int64 {
-	return fi.size
+	return int64(fi.size)
 }
 
 func (fi *fileInfo) UserName() string {
@@ -57,11 +61,11 @@ func (fi *fileInfo) GroupName() string {
 }
 
 func (fi *fileInfo) Flags() int {
-	return fi.flags
+	return int(fi.flags)
 }
 
 func (fi *fileInfo) Mtime() int {
-	return fi.mtime
+	return int(fi.mtime)
 }
 
 func (fi *fileInfo) Digest() string {
@@ -69,9 +73,25 @@ func (fi *fileInfo) Digest() string {
 }
 
 func (fi *fileInfo) Mode() int {
-	return fi.mode
+	return int(fi.mode)
 }
 
 func (fi *fileInfo) Linkname() string {
 	return fi.linkName
+}
+
+func (fi *fileInfo) Device() int {
+	return int(fi.device)
+}
+
+func (fi *fileInfo) Inode() int {
+	return int(fi.inode)
+}
+
+func (fi *fileInfo) fileType() uint32 {
+	return fi.mode &^ 07777
+}
+
+func (fi *fileInfo) inode64() uint64 {
+	return (uint64(fi.device) << 32) | uint64(fi.inode)
 }

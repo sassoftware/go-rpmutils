@@ -27,6 +27,7 @@ func TestReadHeader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer f.Close()
 
 	hdr, err := readHeader(iotest.HalfReader(f))
 	if err != nil {

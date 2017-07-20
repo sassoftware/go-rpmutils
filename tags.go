@@ -35,9 +35,21 @@ const (
 	EPOCH             = 1003
 	SUMMARY           = 1004
 	DESCRIPTION       = 1005
+	BUILDTIME         = 1006
+	BUILDHOST         = 1007
+	SIZE              = 1009
+	DISTRIBUTION      = 1010
 	VENDOR            = 1011
+	GIF               = 1012
+	XPM               = 1013
 	LICENSE           = 1014
+	PACKAGER          = 1015
+	GROUP             = 1016
+	CHANGELOG         = 1017
 	SOURCE            = 1018
+	PATCH             = 1019
+	URL               = 1020
+	OS                = 1021
 	ARCH              = 1022
 	PREIN             = 1023
 	POSTIN            = 1024
@@ -53,8 +65,10 @@ const (
 	FILEFLAGS         = 1037 // bitmask: RPMFILE_* are bitmasks to interpret
 	FILEUSERNAME      = 1039
 	FILEGROUPNAME     = 1040
+	ICON              = 1043
 	SOURCERPM         = 1044
 	FILEVERIFYFLAGS   = 1045 // bitmask: RPMVERIFY_* are bitmasks to interpret
+	ARCHIVESIZE       = 1046
 	PROVIDENAME       = 1047
 	REQUIREFLAGS      = 1048
 	REQUIRENAME       = 1049
@@ -71,6 +85,8 @@ const (
 	PREUNPROG         = 1087
 	POSTUNPROG        = 1088
 	OBSOLETENAME      = 1090
+	FILEDEVICES       = 1095
+	FILEINODES        = 1096
 	PROVIDEFLAGS      = 1112
 	PROVIDEVERSION    = 1113
 	OBSOLETEFLAGS     = 1114
@@ -92,21 +108,30 @@ const (
 	FLINKNEVRA   = 1169
 	TRIGGERPREIN = 1170
 
+	LONGFILESIZES  = 5008
+	LONGSIZE       = 5009
+	FILECAPS       = 5010
 	FILEDIGESTALGO = 5011
+	BUGURL         = 5012
+	VCS            = 5034
+	ENCODING       = 5062
 
-	SIG_BASE = 256
-	SIG_DSA  = SIG_BASE + 11
-	SIG_RSA  = SIG_BASE + 12
-	SIG_SHA1 = SIG_BASE + 13
+	SIG_BASE            = 256
+	SIG_DSA             = SIG_BASE + 11 // DSA signature over header only
+	SIG_RSA             = SIG_BASE + 12 // RSA signature over header only
+	SIG_SHA1            = SIG_BASE + 13 // SHA1 over header only (hex)
+	SIG_LONGSIZE        = SIG_BASE + 15 // header + compressed payload (uint64)
+	SIG_LONGARCHIVESIZE = SIG_BASE + 15 // uncompressed payload bytes (uint64)
 
 	// Given that there is overlap between signature tag headers and general tag
 	// headers, we offset the signature ones by some amount
 	_SIGHEADER_TAG_BASE = 16384
 	SIG_SIZE            = _SIGHEADER_TAG_BASE + 1000 // Header + Payload size
-	SIG_PGP             = _SIGHEADER_TAG_BASE + 1002
+	SIG_PGP             = _SIGHEADER_TAG_BASE + 1002 // Signature over header + payload
 	SIG_MD5             = _SIGHEADER_TAG_BASE + 1004 // MD5SUM of header + payload
-	SIG_GPG             = _SIGHEADER_TAG_BASE + 1005
-	SIG_RESERVEDSPACE   = _SIGHEADER_TAG_BASE + 1008
+	SIG_GPG             = _SIGHEADER_TAG_BASE + 1005 // (same as SIG_PGP)
+	SIG_PAYLOADSIZE     = _SIGHEADER_TAG_BASE + 1007 // uncompressed payload bytes (uint32)
+	SIG_RESERVEDSPACE   = _SIGHEADER_TAG_BASE + 1008 // blank space that can be replaced by a signature
 
 	// FILEFLAGS bitmask elements:
 	RPMFILE_NONE      = 0

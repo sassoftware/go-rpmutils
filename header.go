@@ -155,8 +155,9 @@ func (hdr *rpmHeader) Get(tag int) (interface{}, error) {
 	switch ent.dataType {
 	case RPM_STRING_TYPE, RPM_STRING_ARRAY_TYPE, RPM_I18NSTRING_TYPE:
 		return hdr.GetStrings(tag)
-	case RPM_INT8_TYPE, RPM_INT16_TYPE, RPM_INT32_TYPE:
-		return hdr.GetInts(tag)
+	case RPM_INT8_TYPE, RPM_INT16_TYPE, RPM_INT32_TYPE, RPM_INT64_TYPE:
+		out, _, err := hdr.getInts(tag)
+		return out, err
 	case RPM_CHAR_TYPE, RPM_BIN_TYPE:
 		return hdr.GetBytes(tag)
 	default:
@@ -171,7 +172,7 @@ func (hdr *rpmHeader) GetStrings(tag int) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		dirIdxs, err := hdr.GetInts(DIRINDEXES)
+		dirIdxs, err := hdr.GetUint32s(DIRINDEXES)
 		if err != nil {
 			return nil, err
 		}
@@ -196,27 +197,125 @@ func (hdr *rpmHeader) GetStrings(tag int) ([]string, error) {
 	return strs[:ent.count], nil
 }
 
-func (hdr *rpmHeader) GetInts(tag int) ([]int, error) {
+// get an int array using whatever the appropriate sized type is
+func (hdr *rpmHeader) getInts(tag int) (buf interface{}, n int, err error) {
 	ent, ok := hdr.entries[tag]
 	if !ok {
-		return nil, NewNoSuchTagError(tag)
+		return nil, 0, NewNoSuchTagError(tag)
 	}
-	out := make([]int, ent.count)
-	content := ent.contents
-	for i := int32(0); i < ent.count; i++ {
-		switch ent.dataType {
-		case RPM_INT8_TYPE:
-			out[i] = int(content[0])
-			content = content[1:]
-		case RPM_INT16_TYPE:
-			out[i] = int(binary.BigEndian.Uint16(content[:2]))
-			content = content[2:]
-		case RPM_INT32_TYPE:
-			out[i] = int(binary.BigEndian.Uint32(content[:4]))
-			content = content[4:]
+	n = len(ent.contents)
+	switch ent.dataType {
+	case RPM_INT8_TYPE:
+		buf = make([]uint8, n)
+	case RPM_INT16_TYPE:
+		n >>= 1
+		buf = make([]uint16, n)
+	case RPM_INT32_TYPE:
+		n >>= 2
+		buf = make([]uint32, n)
+	case RPM_INT64_TYPE:
+		n >>= 3
+		buf = make([]uint64, n)
+	default:
+		return nil, 0, fmt.Errorf("tag %d isn't an int type", tag)
+	}
+	if err := binary.Read(bytes.NewReader(ent.contents), binary.BigEndian, buf); err != nil {
+		return nil, 0, err
+	}
+	return
+}
+
+// Get an int array using the default 'int' type. DEPRECATED because all rpm
+// integers are unsigned, so some int32 values might not fit. Returns an error
+// in case of overflow.
+func (hdr *rpmHeader) GetInts(tag int) ([]int, error) {
+	buf, n, err := hdr.getInts(tag)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]int, n)
+	switch bvals := buf.(type) {
+	case []uint8:
+		for i, v := range bvals {
+			out[i] = int(v)
+		}
+	case []uint16:
+		for i, v := range bvals {
+			out[i] = int(v)
+		}
+	case []uint32:
+		for i, v := range bvals {
+			if v > (1<<31)-1 {
+				return nil, fmt.Errorf("value %d out of range for int32 array in tag %d", i, tag)
+			}
+			out[i] = int(v)
+		}
+	default:
+		return nil, fmt.Errorf("tag %d is too big for int type", tag)
+	}
+	return out, nil
+}
+
+// Get an int array as a uint32 slice. This can accomodate any int type other
+// than INT64.
+func (hdr *rpmHeader) GetUint32s(tag int) ([]uint32, error) {
+	buf, n, err := hdr.getInts(tag)
+	if err != nil {
+		return nil, err
+	}
+	if out, ok := buf.([]uint32); ok {
+		return out, nil
+	}
+	out := make([]uint32, n)
+	switch bvals := buf.(type) {
+	case []uint8:
+		for i, v := range bvals {
+			out[i] = uint32(v)
+		}
+	case []uint16:
+		for i, v := range bvals {
+			out[i] = uint32(v)
+		}
+	default:
+		return nil, fmt.Errorf("tag %d is too big for int type", tag)
+	}
+	return out, nil
+}
+
+// Get an int array as a uint64 slice. This can accomodate all int types.
+func (hdr *rpmHeader) GetUint64s(tag int) ([]uint64, error) {
+	buf, n, err := hdr.getInts(tag)
+	if err != nil {
+		return nil, err
+	}
+	if out, ok := buf.([]uint64); ok {
+		return out, nil
+	}
+	out := make([]uint64, n)
+	switch bvals := buf.(type) {
+	case []uint8:
+		for i, v := range bvals {
+			out[i] = uint64(v)
+		}
+	case []uint16:
+		for i, v := range bvals {
+			out[i] = uint64(v)
+		}
+	case []uint32:
+		for i, v := range bvals {
+			out[i] = uint64(v)
 		}
 	}
 	return out, nil
+}
+
+// Get longTag if it exists, otherwise intTag
+func (hdr *rpmHeader) GetUint64Fallback(intTag, longTag int) ([]uint64, error) {
+	if _, ok := hdr.entries[longTag]; ok {
+		return hdr.GetUint64s(longTag)
+	} else {
+		return hdr.GetUint64s(intTag)
+	}
 }
 
 func (hdr *rpmHeader) GetBytes(tag int) ([]byte, error) {
@@ -271,7 +370,7 @@ func (hdr *rpmHeader) GetFiles() ([]FileInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	fileSizes, err := hdr.GetInts(FILESIZES)
+	fileSizes, err := hdr.GetUint64Fallback(FILESIZES, LONGFILESIZES)
 	if err != nil {
 		return nil, err
 	}
@@ -283,11 +382,11 @@ func (hdr *rpmHeader) GetFiles() ([]FileInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	fileFlags, err := hdr.GetInts(FILEFLAGS)
+	fileFlags, err := hdr.GetUint32s(FILEFLAGS)
 	if err != nil {
 		return nil, err
 	}
-	fileMtimes, err := hdr.GetInts(FILEMTIMES)
+	fileMtimes, err := hdr.GetUint32s(FILEMTIMES)
 	if err != nil {
 		return nil, err
 	}
@@ -295,7 +394,7 @@ func (hdr *rpmHeader) GetFiles() ([]FileInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	fileModes, err := hdr.GetInts(FILEMODES)
+	fileModes, err := hdr.GetUint32s(FILEMODES)
 	if err != nil {
 		return nil, err
 	}
@@ -303,12 +402,20 @@ func (hdr *rpmHeader) GetFiles() ([]FileInfo, error) {
 	if err != nil {
 		return nil, err
 	}
+	devices, err := hdr.GetUint32s(FILEDEVICES)
+	if err != nil {
+		devices = make([]uint32, len(paths))
+	}
+	inodes, err := hdr.GetUint32s(FILEINODES)
+	if err != nil {
+		inodes = make([]uint32, len(paths))
+	}
 
 	files := make([]FileInfo, len(paths))
 	for i := 0; i < len(paths); i++ {
 		files[i] = &fileInfo{
 			name:      paths[i],
-			size:      int64(fileSizes[i]),
+			size:      fileSizes[i],
 			userName:  fileUserName[i],
 			groupName: fileGroupName[i],
 			flags:     fileFlags[i],
@@ -316,6 +423,8 @@ func (hdr *rpmHeader) GetFiles() ([]FileInfo, error) {
 			digest:    fileDigests[i],
 			mode:      fileModes[i],
 			linkName:  linkTos[i],
+			device:    devices[i],
+			inode:     inodes[i],
 		}
 	}
 

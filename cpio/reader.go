@@ -24,8 +24,14 @@ type Reader struct {
 }
 
 func NewReader(stream io.Reader) *Reader {
+	return NewReaderWithSizes(stream, nil)
+}
+
+func NewReaderWithSizes(stream io.Reader, sizes []int64) *Reader {
+	cstream := NewCpioStream(stream)
+	cstream.SetFileSizes(sizes)
 	return &Reader{
-		stream:  NewCpioStream(stream),
+		stream:  cstream,
 		cur_ent: nil,
 	}
 }
@@ -34,6 +40,8 @@ func (r *Reader) Next() (*Cpio_newc_header, error) {
 	ent, err := r.stream.ReadNextEntry()
 	if err != nil {
 		return nil, err
+	} else if ent.Header.filename == TRAILER {
+		return nil, io.EOF
 	}
 	r.cur_ent = ent
 	return r.cur_ent.Header, nil

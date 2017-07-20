@@ -17,11 +17,14 @@
 package cpio
 
 import (
+	"errors"
 	"fmt"
 	"io"
 )
 
 const TRAILER = "TRAILER!!!"
+
+var ErrStrippedHeader = errors.New("invalid cpio header: rpm-style stripped cpio requires supplemental size info")
 
 type CpioEntry struct {
 	Header  *Cpio_newc_header
@@ -31,6 +34,7 @@ type CpioEntry struct {
 type CpioStream struct {
 	stream   *countingReader
 	next_pos int64
+	sizes    []int64
 }
 
 type countingReader struct {
@@ -48,6 +52,11 @@ func NewCpioStream(stream io.Reader) *CpioStream {
 	}
 }
 
+// Provide supplemental file size info so that RPMs with files > 4GiB can be read
+func (cs *CpioStream) SetFileSizes(sizes []int64) {
+	cs.sizes = sizes
+}
+
 func (cs *CpioStream) ReadNextEntry() (*CpioEntry, error) {
 	if cs.next_pos != cs.stream.curr_pos {
 		logger.Debugf("seeking %d, curr_pos: %d, next_pos: %d", cs.next_pos-cs.stream.curr_pos, cs.stream.curr_pos, cs.next_pos)
@@ -61,6 +70,8 @@ func (cs *CpioStream) ReadNextEntry() (*CpioEntry, error) {
 	hdr, err := readHeader(cs.stream)
 	if err != nil {
 		return nil, err
+	} else if hdr.stripped {
+		return cs.readStrippedEntry(hdr)
 	}
 
 	// Read filename
@@ -98,6 +109,22 @@ func (cs *CpioStream) ReadNextEntry() (*CpioEntry, error) {
 	}
 
 	return &entry, nil
+}
+
+func (cs *CpioStream) readStrippedEntry(hdr *Cpio_newc_header) (*CpioEntry, error) {
+	// magic has already been read
+	if cs.sizes == nil {
+		return nil, ErrStrippedHeader
+	} else if hdr.index >= len(cs.sizes) {
+		return nil, fmt.Errorf("stripped cpio refers to invalid file index %d", hdr.index)
+	}
+	size := cs.sizes[hdr.index]
+	cs.next_pos = pad64(cs.stream.curr_pos + size)
+	payload, err := newFileStream(cs.stream, size)
+	if err != nil {
+		return nil, err
+	}
+	return &CpioEntry{Header: hdr, payload: payload}, nil
 }
 
 func (cr *countingReader) Read(p []byte) (n int, err error) {

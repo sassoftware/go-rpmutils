@@ -17,7 +17,6 @@
 package cpio
 
 import (
-	"encoding/binary"
 	"fmt"
 	"io"
 	"strconv"
@@ -25,9 +24,11 @@ import (
 
 // reference http://people.freebsd.org/~kientzle/libarchive/man/cpio.5.txt
 
-const cpio_newc_header_length = 110
-
-const cpio_newc_magic = "070701"
+const (
+	cpio_newc_header_length = 110
+	cpio_newc_magic         = "070701"
+	cpio_stripped_magic     = "07070X"
+)
 
 type Cpio_newc_header struct {
 	c_magic     string
@@ -45,23 +46,23 @@ type Cpio_newc_header struct {
 	c_namesize  int
 	c_check     int
 
+	stripped bool
 	filename string
+	index    int
+	size64   int64
 }
 
 type binaryReader struct {
-	r io.Reader
-}
-
-func (br *binaryReader) Read(buf interface{}) error {
-	return binary.Read(br.r, binary.BigEndian, buf)
+	r   io.Reader
+	buf [8]byte
 }
 
 func (br *binaryReader) Read16(buf *int) error {
-	b := make([]byte, 8)
-	if err := br.Read(&b); err != nil {
+	bb := br.buf[:8]
+	if _, err := io.ReadFull(br.r, bb); err != nil {
 		return err
 	}
-	i, err := strconv.ParseInt(string(b), 16, 0)
+	i, err := strconv.ParseInt(string(bb), 16, 0)
 	if err != nil {
 		return err
 	}
@@ -78,7 +79,9 @@ func readHeader(r io.Reader) (*Cpio_newc_header, error) {
 	if _, err := io.ReadFull(r, magic); err != nil {
 		return nil, err
 	}
-	if string(magic) != cpio_newc_magic {
+	if string(magic) == cpio_stripped_magic {
+		return readStrippedHeader(br)
+	} else if string(magic) != cpio_newc_magic {
 		logger.Debugf("bad magic: %s", string(magic))
 		return nil, fmt.Errorf("bad magic")
 	}
@@ -105,6 +108,7 @@ func readHeader(r io.Reader) (*Cpio_newc_header, error) {
 	if err := br.Read16(&hdr.c_filesize); err != nil {
 		return nil, err
 	}
+	hdr.size64 = int64(hdr.c_filesize)
 	if err := br.Read16(&hdr.c_devmajor); err != nil {
 		return nil, err
 	}
@@ -126,6 +130,18 @@ func readHeader(r io.Reader) (*Cpio_newc_header, error) {
 	dumpHeader(&hdr)
 
 	return &hdr, nil
+}
+
+func readStrippedHeader(br binaryReader) (*Cpio_newc_header, error) {
+	hdr := &Cpio_newc_header{
+		c_magic:  cpio_stripped_magic,
+		stripped: true,
+	}
+	if err := br.Read16(&hdr.index); err != nil {
+		return nil, err
+	}
+	logger.Debugf("stripped header %d\n", hdr.index)
+	return hdr, nil
 }
 
 func dumpHeader(hdr *Cpio_newc_header) {
@@ -190,4 +206,18 @@ func (hdr *Cpio_newc_header) Check() int {
 
 func (hdr *Cpio_newc_header) Filename() string {
 	return hdr.filename
+}
+
+// stripped header functions
+
+func (hdr *Cpio_newc_header) IsStripped() bool {
+	return hdr.stripped
+}
+
+func (hdr *Cpio_newc_header) Index() int {
+	return hdr.index
+}
+
+func (hdr *Cpio_newc_header) Filesize64() int64 {
+	return hdr.size64
 }

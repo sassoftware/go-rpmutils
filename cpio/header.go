@@ -70,7 +70,7 @@ func (br *binaryReader) Read16(buf *int) error {
 }
 
 func readHeader(r io.Reader) (*Cpio_newc_header, error) {
-	log.Debug("reading header")
+	logger.Debug("reading header")
 	hdr := Cpio_newc_header{}
 	br := binaryReader{r: r}
 
@@ -79,7 +79,7 @@ func readHeader(r io.Reader) (*Cpio_newc_header, error) {
 		return nil, err
 	}
 	if string(magic) != cpio_newc_magic {
-		log.Debugf("bad magic: %s", string(magic))
+		logger.Debugf("bad magic: %s", string(magic))
 		return nil, fmt.Errorf("bad magic")
 	}
 	hdr.c_magic = cpio_newc_magic
@@ -129,7 +129,7 @@ func readHeader(r io.Reader) (*Cpio_newc_header, error) {
 }
 
 func dumpHeader(hdr *Cpio_newc_header) {
-	log.Debugf("header %+v", hdr)
+	logger.Debugf("header %+v", hdr)
 }
 
 func (hdr *Cpio_newc_header) Magic() string {

@@ -42,11 +42,11 @@ func newFileStream(stream io.ReadSeeker, size int64) (*file_stream, error) {
 }
 
 func (fs *file_stream) Read(p []byte) (n int, err error) {
-	log.Debugf("reading: %d, start_pos: %d, curr_pos: %d, size: %d",
+	logger.Debugf("reading: %d, start_pos: %d, curr_pos: %d, size: %d",
 		len(p), fs.start_pos, fs.curr_pos, fs.size)
 	if fs.curr_pos >= fs.size {
-		log.Debugf("cur_pos: %d, size: %d", fs.curr_pos, fs.size)
-		log.Debug("EOF")
+		logger.Debugf("cur_pos: %d, size: %d", fs.curr_pos, fs.size)
+		logger.Debug("EOF")
 		return 0, io.EOF
 	}
 
@@ -55,7 +55,7 @@ func (fs *file_stream) Read(p []byte) (n int, err error) {
 		return 0, err
 	}
 	if fs.start_pos+fs.curr_pos != pos {
-		log.Debugf("start_pos: %d, curr_pos: %d, pos: %d",
+		logger.Debugf("start_pos: %d, curr_pos: %d, pos: %d",
 			fs.start_pos, fs.curr_pos, pos)
 		return 0, fmt.Errorf("read out of order")
 	}
@@ -65,6 +65,6 @@ func (fs *file_stream) Read(p []byte) (n int, err error) {
 	}
 	n, err = fs.stream.Read(p)
 	fs.curr_pos += int64(n)
-	//log.Debugf("read %v", p)
+	//logger.Debugf("read %v", p)
 	return
 }

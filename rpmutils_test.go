@@ -104,7 +104,7 @@ func TestExpandPayload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	log.Debugf("using destdir: %s", tmpdir)
+	logger.Debugf("using destdir: %s", tmpdir)
 
 	if err := rpm.ExpandPayload(tmpdir); err != nil {
 		t.Fatal(err)

@@ -25,20 +25,20 @@ import (
 func TestCmdLogging(t *testing.T) {
 	buf := new(bytes.Buffer)
 	setupLogging(buf, nil, false, false)
-	log.Info("foo")
+	logger.Info("foo")
 	if string(buf.Bytes()) != "foo\n" {
 		t.Fatalf("got the wrong output: %s", string(buf.Bytes()))
 	}
 	buf.Reset()
 
-	log.Debug("bar")
+	logger.Debug("bar")
 	if string(buf.Bytes()) != "" {
 		t.Fatalf("got the wrong output: %s", string(buf.Bytes()))
 	}
 
 	setupLogging(buf, nil, false, true)
 	buf.Reset()
-	log.Debug("bar")
+	logger.Debug("bar")
 	if string(buf.Bytes()) != "bar\n" {
 		t.Fatalf("got the wrong output: %s", string(buf.Bytes()))
 	}
@@ -47,20 +47,20 @@ func TestCmdLogging(t *testing.T) {
 func TestLogFileLogging(t *testing.T) {
 	buf := new(bytes.Buffer)
 	setupLogging(nil, buf, false, false)
-	log.Info("foo")
+	logger.Info("foo")
 	if !strings.HasSuffix(string(buf.Bytes()), "foo\n") {
 		t.Fatal("wrong suffix: %s", string(buf.Bytes()))
 	}
 	buf.Reset()
 
-	log.Debug("bar")
+	logger.Debug("bar")
 	if string(buf.Bytes()) != "" {
 		t.Fatal("got wrong output: %s", string(buf.Bytes()))
 	}
 	buf.Reset()
 
 	setupLogging(nil, buf, true, false)
-	log.Debug("bar")
+	logger.Debug("bar")
 	if !strings.HasSuffix(string(buf.Bytes()), "bar\n") {
 		t.Fatal("wrong suffix: %s", string(buf.Bytes()))
 	}
@@ -71,7 +71,7 @@ func TestBothLogging(t *testing.T) {
 	buf2 := new(bytes.Buffer)
 
 	setupLogging(buf1, buf2, false, false)
-	log.Info("foo")
+	logger.Info("foo")
 	if string(buf1.Bytes()) != "foo\n" {
 		t.Fatalf("got the wrong output: \"%s\"", string(buf1.Bytes()))
 	}
@@ -81,7 +81,7 @@ func TestBothLogging(t *testing.T) {
 	buf1.Reset()
 	buf2.Reset()
 
-	log.Debug("bar")
+	logger.Debug("bar")
 	if string(buf1.Bytes()) != "" {
 		t.Fatalf("got the wrong output: \"%s\"", string(buf1.Bytes()))
 	}
@@ -92,7 +92,7 @@ func TestBothLogging(t *testing.T) {
 	buf2.Reset()
 
 	setupLogging(buf1, buf2, true, true)
-	log.Debug("bar")
+	logger.Debug("bar")
 	if string(buf1.Bytes()) != "bar\n" {
 		t.Fatalf("got the wrong output: %s", string(buf1.Bytes()))
 	}

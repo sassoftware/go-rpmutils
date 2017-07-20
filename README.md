@@ -42,7 +42,7 @@ func Main() {
 1. Read contributor agreement
 2. Fork it
 3. Create your feature branch (`git checkout -b my-new-feature`)
-4. Commit your changes (`git commit -am 'Add some feature'`)
+4. Commit your changes (`git commit -a`). Make sure to include a Signed-off-by line per the contributor agreement.
 5. Push to the branch (`git push origin my-new-feature`)
 6. Create new Pull Request
 

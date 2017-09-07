@@ -2,10 +2,10 @@ Go RPM Utils
 ============
 go-rpmutils is a library written in [go](http://golang.org) for parsing and extracting content from [RPMs](http://www.rpm.org).
 
-#Overview
+## Overview
 go-rpmutils provides a few interfaces for handling RPM packages. There is a highlevel `Rpm` struct that provides access to the RPM header and [CPIO](https://en.wikipedia.org/wiki/Cpio) payload. The CPIO payload can be extracted to a filesystem location via the `ExpandPayload` function or through a Reader interface, similar to the [tar implementation](https://golang.org/pkg/archive/tar/) in the go standard library.
 
-#Example
+## Example
 ```go
 func Main() {
     f, err := os.Open("foo.rpm")

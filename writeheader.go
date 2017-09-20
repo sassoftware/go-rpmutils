@@ -104,6 +104,7 @@ func (hdr *rpmHeader) WriteTo(outfile io.Writer, regionTag int) error {
 	if err := writeRegion(outfile, blobs, regionTag, len(keys)); err != nil {
 		return err
 	}
+	totalSize := 96 + blobs.Len() + entries.Len()
 	if _, err := io.Copy(outfile, entries); err != nil {
 		return err
 	}
@@ -111,7 +112,7 @@ func (hdr *rpmHeader) WriteTo(outfile io.Writer, regionTag int) error {
 		return err
 	}
 	if regionTag == RPMTAG_HEADERSIGNATURES {
-		alignment := blobs.Len() % 8
+		alignment := totalSize % 8
 		if alignment != 0 {
 			outfile.Write(make([]byte, 8-alignment))
 		}

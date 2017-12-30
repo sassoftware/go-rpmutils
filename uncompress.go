@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"io"
 
-	"xi2.org/x/xz"
+	"github.com/xi2/xz"
 )
 
 // Wrap RPM payload with uncompress reader, assumes that header has

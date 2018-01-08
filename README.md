@@ -7,7 +7,7 @@ go-rpmutils provides a few interfaces for handling RPM packages. There is a high
 
 ## Example
 ```go
-func Main() {
+func main() {
     f, err := os.Open("foo.rpm")
     if err != nil {
         panic(err)
@@ -46,7 +46,7 @@ func Main() {
 5. Push to the branch (`git push origin my-new-feature`)
 6. Create new Pull Request
 
- 
+
 ## License
 
 go-rpmutils is released under the Apache 2.0 license. See [LICENSE](https://github.com/sassoftware/go-rpmutils/blob/master/LICENSE).

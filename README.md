@@ -17,7 +17,7 @@ func main() {
     rpm := rpmutils.ReadRpm(f)
 
     // Get the name, epoch, version, release, and arch
-    nevra, err := rpm.GetNEVRA()
+    nevra, err := rpm.Header.GetNEVRA()
     if err != nil {
         panic(err)
     }

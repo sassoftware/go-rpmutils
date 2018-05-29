@@ -169,6 +169,18 @@ func SignRpmFile(infile *os.File, outpath string, key *packet.PrivateKey, opts *
 	return header, rewriteRpm(infile, outpath, header)
 }
 
+// SignRpmFileIntoStream signs the rpmfile represented by infile with the
+// provided private key and sig options.  The entire signed RPM file is then
+// written to the outstream.
+func SignRpmFileIntoStream(outstream io.Writer, infile io.ReadSeeker, key *packet.PrivateKey, opts *SignatureOptions) error {
+	header, err := SignRpmStream(infile, key, opts)
+	if err != nil {
+		return err
+	}
+	delete(header.sigHeader.entries, SIG_RESERVEDSPACE-_SIGHEADER_TAG_BASE)
+	return writeRpm(infile, outstream, header.sigHeader)
+}
+
 func RewriteWithSignatures(infile *os.File, outpath string, sigPgp, sigRsa []byte) (*RpmHeader, error) {
 	header, err := ReadHeader(infile)
 	if err != nil {

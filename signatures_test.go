@@ -56,7 +56,7 @@ func TestSign(t *testing.T) {
 		t.Fatal("error verifying signature:", err)
 	}
 	if len(sigs) != 2 || sigs[0].Signer != entity || sigs[1].Signer != entity {
-		t.Fatal("error verifying signature: incorrect signers. found: %#v", sigs)
+		t.Fatalf("error verifying signature: incorrect signers. found: %#v", sigs)
 	}
 	// check padding for odd sized signature tags
 	h.sigHeader.entries[1234] = entry{dataType: RPM_BIN_TYPE, count: 3, contents: []byte("foo")}
@@ -66,6 +66,34 @@ func TestSign(t *testing.T) {
 	}
 	if len(sigblob)%8 != 0 {
 		t.Fatalf("incorrect padding: got %d bytes, expected a multiple of 8", len(sigblob))
+	}
+}
+
+func TestSignRpmFileIntoStream(t *testing.T) {
+	keyring, err := openpgp.ReadArmoredKeyRing(bytes.NewReader([]byte(testkey)))
+	if err != nil {
+		t.Fatal("failed to parse test key:", err)
+	}
+	entity := keyring[0]
+
+	f, err := os.Open("testdata/simple-1.0.1-1.i386.rpm")
+	if err != nil {
+		t.Fatal("failed to open test rpm:", err)
+	}
+	defer f.Close()
+
+	buf := &bytes.Buffer{}
+	err = SignRpmFileIntoStream(buf, f, entity.PrivateKey, nil)
+	if err != nil {
+		t.Fatal("error signing rpm:", err)
+	}
+
+	_, sigs, err := Verify(buf, keyring)
+	if err != nil {
+		t.Fatal("error verifying signature:", err)
+	}
+	if len(sigs) != 2 || sigs[0].Signer != entity || sigs[1].Signer != entity {
+		t.Fatalf("error verifying signature: incorrect signers. found: %#v", sigs)
 	}
 }
 

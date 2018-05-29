@@ -49,20 +49,20 @@ func TestLogFileLogging(t *testing.T) {
 	setupLogging(nil, buf, false, false)
 	logger.Info("foo")
 	if !strings.HasSuffix(string(buf.Bytes()), "foo\n") {
-		t.Fatal("wrong suffix: %s", string(buf.Bytes()))
+		t.Fatalf("wrong suffix: %s", string(buf.Bytes()))
 	}
 	buf.Reset()
 
 	logger.Debug("bar")
 	if string(buf.Bytes()) != "" {
-		t.Fatal("got wrong output: %s", string(buf.Bytes()))
+		t.Fatalf("got wrong output: %s", string(buf.Bytes()))
 	}
 	buf.Reset()
 
 	setupLogging(nil, buf, true, false)
 	logger.Debug("bar")
 	if !strings.HasSuffix(string(buf.Bytes()), "bar\n") {
-		t.Fatal("wrong suffix: %s", string(buf.Bytes()))
+		t.Fatalf("wrong suffix: %s", string(buf.Bytes()))
 	}
 }
 
@@ -76,7 +76,7 @@ func TestBothLogging(t *testing.T) {
 		t.Fatalf("got the wrong output: \"%s\"", string(buf1.Bytes()))
 	}
 	if !strings.HasSuffix(string(buf2.Bytes()), "foo\n") {
-		t.Fatal("wrong suffix: %s", string(buf2.Bytes()))
+		t.Fatalf("wrong suffix: %s", string(buf2.Bytes()))
 	}
 	buf1.Reset()
 	buf2.Reset()
@@ -86,7 +86,7 @@ func TestBothLogging(t *testing.T) {
 		t.Fatalf("got the wrong output: \"%s\"", string(buf1.Bytes()))
 	}
 	if string(buf2.Bytes()) != "" {
-		t.Fatal("got wrong output: %s", string(buf2.Bytes()))
+		t.Fatalf("got wrong output: %s", string(buf2.Bytes()))
 	}
 	buf1.Reset()
 	buf2.Reset()
@@ -97,6 +97,6 @@ func TestBothLogging(t *testing.T) {
 		t.Fatalf("got the wrong output: %s", string(buf1.Bytes()))
 	}
 	if !strings.HasSuffix(string(buf2.Bytes()), "bar\n") {
-		t.Fatal("wrong suffix: %s", string(buf2.Bytes()))
+		t.Fatalf("wrong suffix: %s", string(buf2.Bytes()))
 	}
 }

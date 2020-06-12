@@ -56,7 +56,7 @@ func TestSign(t *testing.T) {
 		t.Fatal("error verifying signature:", err)
 	}
 	if len(sigs) != 2 || sigs[0].Signer != entity || sigs[1].Signer != entity {
-		t.Fatal("error verifying signature: incorrect signers. found: %#v", sigs)
+		t.Fatalf("error verifying signature: incorrect signers. found: %#v", sigs)
 	}
 	// check padding for odd sized signature tags
 	h.sigHeader.entries[1234] = entry{dataType: RPM_BIN_TYPE, count: 3, contents: []byte("foo")}

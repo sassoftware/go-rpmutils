@@ -24,7 +24,6 @@ import (
 )
 
 func TestReadHeader(t *testing.T) {
-	//setupLogging(os.Stderr, os.Stderr, true, true)
 	f, err := os.Open("./testdata/simple-1.0.1-1.i386.rpm")
 	if err != nil {
 		t.Fatal(err)
@@ -59,7 +58,6 @@ func TestReadHeader(t *testing.T) {
 }
 
 func TestPayloadReader(t *testing.T) {
-	//setupLogging(os.Stderr, os.Stderr, true, true)
 	f, err := os.Open("./testdata/simple-1.0.1-1.i386.rpm")
 	if err != nil {
 		t.Fatal(err)
@@ -104,7 +102,6 @@ func TestExpandPayload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	logger.Debugf("using destdir: %s", tmpdir)
 
 	if err := rpm.ExpandPayload(tmpdir); err != nil {
 		t.Fatal(err)

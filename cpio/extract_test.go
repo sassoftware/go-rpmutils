@@ -21,20 +21,24 @@ import (
 	"os"
 	"testing"
 	"testing/iotest"
+
+	"github.com/op/go-logging"
 )
 
 func TestExtract(t *testing.T) {
-	setupLogging(nil, os.Stderr, true, false)
+	setupLogging()
 
 	f, err := os.Open("../testdata/foo.cpio")
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer f.Close()
 
 	tmpdir, err := ioutil.TempDir("", "cpio")
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer os.RemoveAll(tmpdir)
 	logger.Debugf("using destdir: %s", tmpdir)
 
 	hf := iotest.HalfReader(f)
@@ -52,4 +56,15 @@ func TestExtract(t *testing.T) {
 	if err := Extract(hf, tmpdir); err != nil {
 		t.Fatal(err)
 	}
+}
+
+var _format = logging.MustStringFormatter(
+	`%{color}%{time:15:04:05.000} %{shortfunc} ▶ %{level:.4s} %{id:03x}%{color:reset} %{message}`,
+)
+
+func setupLogging() {
+	cmdBackend := logging.NewLogBackend(os.Stderr, "", 0)
+	cmdLevel := logging.AddModuleLevel(cmdBackend)
+	cmdLevel.SetLevel(logging.DEBUG, "")
+	logging.SetBackend(cmdLevel)
 }

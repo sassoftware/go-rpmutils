@@ -29,6 +29,8 @@ type NEVRA struct {
 	Arch    string
 }
 
+// TODO: in v2 change epoch to an int
+
 func (nevra *NEVRA) String() string {
 	return fmt.Sprintf("%s-%s:%s-%s.%s.rpm", nevra.Name, nevra.Epoch, nevra.Version, nevra.Release, nevra.Arch)
 }

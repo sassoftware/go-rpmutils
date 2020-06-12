@@ -58,6 +58,34 @@ func TestReadHeader(t *testing.T) {
 	}
 }
 
+func TestEpoch(t *testing.T) {
+	items := [][]string{
+		{"testdata/zero-epoch-0.1-1.x86_64.rpm", "0"},
+		{"testdata/one-epoch-0.1-1.x86_64.rpm", "1"},
+	}
+	for _, item := range items {
+		filename, expected := item[0], item[1]
+		t.Run(expected, func(t *testing.T) {
+			f, err := os.Open(filename)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer f.Close()
+			hdr, err := ReadHeader(f)
+			if err != nil {
+				t.Fatal(err)
+			}
+			nevra, err := hdr.GetNEVRA()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if nevra.Epoch != expected {
+				t.Errorf("%s: expected %q got %q", filename, expected, nevra.Epoch)
+			}
+		})
+	}
+}
+
 func TestPayloadReader(t *testing.T) {
 	f, err := os.Open("./testdata/simple-1.0.1-1.i386.rpm")
 	if err != nil {

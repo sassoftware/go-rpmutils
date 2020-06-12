@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"strconv"
 	"strings"
 )
 
@@ -155,10 +156,10 @@ func (hdr *rpmHeader) Get(tag int) (interface{}, error) {
 	switch ent.dataType {
 	case RPM_STRING_TYPE, RPM_STRING_ARRAY_TYPE, RPM_I18NSTRING_TYPE:
 		return hdr.GetStrings(tag)
-	case RPM_INT8_TYPE, RPM_INT16_TYPE, RPM_INT32_TYPE, RPM_INT64_TYPE:
+	case RPM_INT8_TYPE, RPM_INT16_TYPE, RPM_INT32_TYPE, RPM_INT64_TYPE, RPM_CHAR_TYPE:
 		out, _, err := hdr.getInts(tag)
 		return out, err
-	case RPM_CHAR_TYPE, RPM_BIN_TYPE:
+	case RPM_BIN_TYPE:
 		return hdr.GetBytes(tag)
 	default:
 		return nil, fmt.Errorf("unsupported data type")
@@ -205,7 +206,7 @@ func (hdr *rpmHeader) getInts(tag int) (buf interface{}, n int, err error) {
 	}
 	n = len(ent.contents)
 	switch ent.dataType {
-	case RPM_INT8_TYPE:
+	case RPM_INT8_TYPE, RPM_CHAR_TYPE:
 		buf = make([]uint8, n)
 	case RPM_INT16_TYPE:
 		n >>= 1
@@ -323,7 +324,7 @@ func (hdr *rpmHeader) GetBytes(tag int) ([]byte, error) {
 	if !ok {
 		return nil, NewNoSuchTagError(tag)
 	}
-	if ent.dataType != RPM_CHAR_TYPE && ent.dataType != RPM_BIN_TYPE {
+	if ent.dataType != RPM_BIN_TYPE {
 		return nil, fmt.Errorf("unsupported datatype for bytes: %d, tag: %d", ent.dataType, tag)
 	}
 	return ent.contents, nil
@@ -334,15 +335,12 @@ func (hdr *rpmHeader) GetNEVRA() (*NEVRA, error) {
 	if err != nil {
 		return nil, err
 	}
-	epoch, err := hdr.GetStrings(EPOCH)
-	// Special case epoch, if it doesn't exist, it should be 0 or None
-	if epoch == nil {
-		switch err.(type) {
-		case NoSuchTagError:
-			epoch = []string{"0"}
-		default:
-			return nil, err
-		}
+	epoch, err := hdr.GetUint64s(EPOCH)
+	if _, absent := err.(NoSuchTagError); !absent && err != nil {
+		return nil, err
+	} else if len(epoch) == 0 {
+		// no epoch is treated as 0
+		epoch = []uint64{0}
 	}
 	version, err := hdr.GetStrings(VERSION)
 	if err != nil {
@@ -358,7 +356,7 @@ func (hdr *rpmHeader) GetNEVRA() (*NEVRA, error) {
 	}
 	return &NEVRA{
 		Name:    name[0],
-		Epoch:   epoch[0],
+		Epoch:   strconv.FormatUint(epoch[0], 10),
 		Version: version[0],
 		Release: release[0],
 		Arch:    arch[0],

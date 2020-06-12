@@ -19,6 +19,7 @@ package cpio
 import (
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"testing"
 	"testing/iotest"
 
@@ -55,6 +56,27 @@ func TestExtract(t *testing.T) {
 	hf = iotest.HalfReader(f)
 	if err := Extract(hf, tmpdir); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestExtractDotdot(t *testing.T) {
+	setupLogging()
+	f, err := os.Open("../testdata/dotdot.cpio")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	tmpdir, err := ioutil.TempDir("", "cpio")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpdir)
+	err = Extract(f, tmpdir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(tmpdir, "aaaaaaaaa")); err != nil {
+		t.Error("expected file with ../ to extract into top of destdir:", err)
 	}
 }
 

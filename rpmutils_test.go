@@ -28,6 +28,7 @@ func TestReadHeader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer f.Close()
 
 	hdr, err := ReadHeader(iotest.HalfReader(f))
 	if err != nil {
@@ -62,6 +63,7 @@ func TestPayloadReader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer f.Close()
 
 	rpm, err := ReadRpm(iotest.HalfReader(f))
 	if err != nil {
@@ -92,6 +94,7 @@ func TestExpandPayload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer f.Close()
 
 	rpm, err := ReadRpm(iotest.HalfReader(f))
 	if err != nil {
@@ -102,6 +105,7 @@ func TestExpandPayload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer os.RemoveAll(tmpdir)
 
 	if err := rpm.ExpandPayload(tmpdir); err != nil {
 		t.Fatal(err)

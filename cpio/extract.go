@@ -21,6 +21,8 @@ import (
 	"io"
 	"os"
 	"path"
+	"path/filepath"
+	"strings"
 
 	"github.com/sassoftware/go-rpmutils/fileutil"
 )
@@ -39,7 +41,9 @@ const (
 	S_ISSOCK = 0140000 // Socket
 )
 
+// Extract the contents of a cpio stream from r to the destination directory dest
 func Extract(rs io.Reader, dest string) error {
+	dest = filepath.Clean(filepath.FromSlash(dest))
 	linkMap := make(map[int][]string)
 
 	stream := NewCpioStream(rs)
@@ -54,16 +58,21 @@ func Extract(rs io.Reader, dest string) error {
 			break
 		}
 
-		target := path.Join(dest, path.Clean(entry.Header.filename))
-		parent := path.Dir(target)
-
-		// Create the parent directory if it doesn't exist.
-		if _, err := os.Stat(parent); os.IsNotExist(err) {
-			if err := os.MkdirAll(parent, 0755); err != nil {
-				return err
-			}
+		// sanitize path
+		target := path.Clean(entry.Header.filename)
+		for strings.HasPrefix(target, "../") {
+			target = target[3:]
 		}
-
+		target = filepath.Join(dest, filepath.FromSlash(target))
+		if !strings.HasPrefix(target, dest+string(filepath.Separator)) && dest != target {
+			// this shouldn't happen due to the sanitization above but always check
+			return fmt.Errorf("invalid cpio path %q", entry.Header.filename)
+		}
+		// Create the parent directory if it doesn't exist.
+		parent := filepath.Dir(target)
+		if err := os.MkdirAll(parent, 0755); err != nil {
+			return err
+		}
 		// FIXME: Need a makedev implementation in go.
 
 		switch entry.Header.Mode() &^ 07777 {

@@ -22,13 +22,9 @@ import (
 	"path/filepath"
 	"testing"
 	"testing/iotest"
-
-	"github.com/op/go-logging"
 )
 
 func TestExtract(t *testing.T) {
-	setupLogging()
-
 	f, err := os.Open("../testdata/foo.cpio")
 	if err != nil {
 		t.Fatal(err)
@@ -40,14 +36,11 @@ func TestExtract(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(tmpdir)
-	logger.Debugf("using destdir: %s", tmpdir)
 
 	hf := iotest.HalfReader(f)
 	if err := Extract(hf, tmpdir); err != nil {
 		t.Fatal(err)
 	}
-
-	logger.Debugf("Test second extract on existing directory using destdir: %s", tmpdir)
 
 	if f, err = os.Open("../testdata/foo.cpio"); err != nil {
 		t.Fatal(err)
@@ -60,7 +53,6 @@ func TestExtract(t *testing.T) {
 }
 
 func TestExtractDotdot(t *testing.T) {
-	setupLogging()
 	f, err := os.Open("../testdata/dotdot.cpio")
 	if err != nil {
 		t.Fatal(err)
@@ -78,15 +70,4 @@ func TestExtractDotdot(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(tmpdir, "aaaaaaaaa")); err != nil {
 		t.Error("expected file with ../ to extract into top of destdir:", err)
 	}
-}
-
-var _format = logging.MustStringFormatter(
-	`%{color}%{time:15:04:05.000} %{shortfunc} ▶ %{level:.4s} %{id:03x}%{color:reset} %{message}`,
-)
-
-func setupLogging() {
-	cmdBackend := logging.NewLogBackend(os.Stderr, "", 0)
-	cmdLevel := logging.AddModuleLevel(cmdBackend)
-	cmdLevel.SetLevel(logging.DEBUG, "")
-	logging.SetBackend(cmdLevel)
 }

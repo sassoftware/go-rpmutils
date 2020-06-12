@@ -59,7 +59,6 @@ func (cs *CpioStream) SetFileSizes(sizes []int64) {
 
 func (cs *CpioStream) ReadNextEntry() (*CpioEntry, error) {
 	if cs.next_pos != cs.stream.curr_pos {
-		logger.Debugf("seeking %d, curr_pos: %d, next_pos: %d", cs.next_pos-cs.stream.curr_pos, cs.stream.curr_pos, cs.next_pos)
 		_, err := cs.stream.Seek(cs.next_pos-cs.stream.curr_pos, 1)
 		if err != nil {
 			return nil, err
@@ -81,7 +80,6 @@ func (cs *CpioStream) ReadNextEntry() (*CpioEntry, error) {
 	}
 
 	filename := string(buf[:len(buf)-1])
-	logger.Debugf("filename: %s", filename)
 
 	offset := pad(cpio_newc_header_length+int(hdr.c_namesize)) - cpio_newc_header_length - int(hdr.c_namesize)
 
@@ -140,7 +138,6 @@ func (cr *countingReader) Seek(offset int64, whence int) (int64, error) {
 	if offset == 0 {
 		return cr.curr_pos, nil
 	}
-	logger.Debugf("offset: %d, curr_pos: %d", offset, cr.curr_pos)
 	b := make([]byte, offset)
 	n, err := io.ReadFull(cr, b)
 	if err != nil && err != io.EOF {

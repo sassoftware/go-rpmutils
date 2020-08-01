@@ -49,7 +49,9 @@ func TestSign(t *testing.T) {
 		t.Fatalf("incorrect padding: got %d bytes, expected a multiple of 8", len(sigblob))
 	}
 	// verify by merging the new sig header with the original file
-	f.Seek(int64(h.OriginalSignatureHeaderSize()), io.SeekStart)
+	if _, err = f.Seek(int64(h.OriginalSignatureHeaderSize()), io.SeekStart); err != nil {
+		t.Fatal("error seeking:", err)
+	}
 	signed := io.MultiReader(bytes.NewReader(sigblob), f)
 	_, sigs, err := Verify(signed, keyring)
 	if err != nil {

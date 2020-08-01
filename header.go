@@ -96,9 +96,15 @@ func readHeader(f io.Reader, hash string, isSource bool, sigBlock bool) (*rpmHea
 	// Check sha1 if it was specified
 	if len(hash) > 1 {
 		h := sha1.New()
-		binary.Write(h, binary.BigEndian, &intro)
-		h.Write(entryTable)
-		h.Write(data)
+		if err = binary.Write(h, binary.BigEndian, &intro); err != nil {
+			return nil, err
+		}
+		if _, err = h.Write(entryTable); err != nil {
+			return nil, err
+		}
+		if _, err = h.Write(data); err != nil {
+			return nil, err
+		}
 		if fmt.Sprintf("%x", h.Sum(nil)) != hash {
 			return nil, fmt.Errorf("bad header sha1")
 		}

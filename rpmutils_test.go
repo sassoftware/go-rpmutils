@@ -44,8 +44,16 @@ func TestReadHeader(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if nevra.Epoch != "0" || nevra.Name != "simple" || nevra.Version != "1.0.1" || nevra.Release != "1" || nevra.Arch != "i386" {
-		t.Fatalf("incorrect nevra: %s-%s:%s-%s.%s", nevra.Name, nevra.Epoch, nevra.Version, nevra.Release, nevra.Arch)
+	expectedNevra := NEVRA{
+		Epoch:   "0",
+		Name:    "simple",
+		Version: "1.0.1",
+		Release: "1",
+		Arch:    "i386",
+	}
+	if expectedNevra != *nevra {
+		t.Fatalf("incorrect nevra: %s (expected %s)",
+			nevra.String(), expectedNevra.String())
 	}
 
 	files, err := hdr.GetFiles()
@@ -55,6 +63,16 @@ func TestReadHeader(t *testing.T) {
 
 	if len(files) != 3 {
 		t.Fatalf("incorrect number of files %d", len(files))
+	}
+
+	hdrRange := hdr.GetRange()
+	expectedRange := HeaderRange{
+		Start: 280,
+		End:   1764,
+	}
+	if hdrRange != expectedRange {
+		t.Errorf("incorrect header range %+v (expected %+v)",
+			hdrRange, expectedRange)
 	}
 }
 

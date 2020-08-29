@@ -116,6 +116,20 @@ func readSignatureHeader(f io.Reader) ([]byte, *rpmHeader, error) {
 	return lead, hdr, err
 }
 
+type HeaderRange struct {
+	Start int
+	End   int
+}
+
+func (hdr *RpmHeader) GetRange() HeaderRange {
+	start := 96 + hdr.sigHeader.origSize
+	end := start + hdr.genHeader.origSize
+	return HeaderRange{
+		Start: start,
+		End:   end,
+	}
+}
+
 func (hdr *RpmHeader) HasTag(tag int) bool {
 	h, t := hdr.getHeader(tag)
 	return h.HasTag(t)

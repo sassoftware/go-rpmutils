@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/klauspost/compress/zstd"
 	"github.com/xi2/xz"
 )
 
@@ -63,6 +64,8 @@ func uncompressRpmPayloadReader(r io.Reader, hdr *RpmHeader) (io.Reader, error) 
 	}
 
 	switch compression {
+	case "zstd":
+		return zstd.NewReader(r)
 	case "gzip":
 		return gzip.NewReader(r)
 	case "bzip2":

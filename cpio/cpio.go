@@ -46,6 +46,18 @@ type countingReader struct {
 	curPos int64
 }
 
+func (ce *CpioEntry) ReadAll() ([]byte, error) {
+	return io.ReadAll(ce.payload)
+}
+
+func (ce *CpioEntry) Copy(dst io.Writer) (written int64, err error) {
+	return io.Copy(dst, ce.payload)
+}
+
+func (ce *CpioEntry) HasPayload() bool {
+	return ce.payload != nil
+}
+
 // NewCpioStream starts reading files from a cpio archive
 func NewCpioStream(stream io.Reader) *CpioStream {
 	return &CpioStream{

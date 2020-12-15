@@ -48,5 +48,5 @@ func (r *Reader) Next() (*Cpio_newc_header, error) {
 }
 
 func (r *Reader) Read(p []byte) (n int, err error) {
-	return r.cur_ent.payload.Read(p)
+	return r.cur_ent.Payload.Read(p)
 }

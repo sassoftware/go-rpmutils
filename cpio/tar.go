@@ -64,7 +64,7 @@ func Tar(rs io.Reader, tarfile *tar.Writer) error {
 		case S_ISLNK:
 			tarHeader.Typeflag = tar.TypeSymlink
 			buf := make([]byte, entry.Header.c_filesize)
-			if _, err := entry.payload.Read(buf); err != nil {
+			if _, err := entry.Payload.Read(buf); err != nil {
 				return err
 			}
 			tarHeader.Linkname = string(buf)
@@ -75,7 +75,7 @@ func Tar(rs io.Reader, tarfile *tar.Writer) error {
 				continue
 			}
 			tarHeader.Typeflag = tar.TypeReg
-			payload = entry.payload
+			payload = entry.Payload
 			inodes[entry.Header.c_ino] = entry.Header.filename
 		default:
 			return fmt.Errorf("unknown file mode 0%o for %s",
@@ -85,7 +85,7 @@ func Tar(rs io.Reader, tarfile *tar.Writer) error {
 			return fmt.Errorf("could not write tar header for %v: %v", tarHeader.Name, err)
 		}
 		if payload != nil {
-			written, err := io.Copy(tarfile, entry.payload)
+			written, err := io.Copy(tarfile, entry.Payload)
 			if err != nil {
 				return fmt.Errorf("could not write body for %v: %v", tarHeader.Name, err)
 			}

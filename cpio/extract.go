@@ -93,7 +93,7 @@ func Extract(rs io.Reader, dest string) error {
 			}
 		case S_ISLNK:
 			buf := make([]byte, entry.Header.c_filesize)
-			if _, err := entry.payload.Read(buf); err != nil {
+			if _, err := entry.Payload.Read(buf); err != nil {
 				return err
 			}
 			if err := os.Symlink(string(buf), target); err != nil {
@@ -116,7 +116,7 @@ func Extract(rs io.Reader, dest string) error {
 			if err != nil {
 				return err
 			}
-			written, err := io.Copy(f, entry.payload)
+			written, err := io.Copy(f, entry.Payload)
 			if err != nil {
 				return err
 			}

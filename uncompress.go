@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/DataDog/zstd"
 	"github.com/xi2/xz"
 )
 
@@ -69,6 +70,8 @@ func uncompressRpmPayloadReader(r io.Reader, hdr *RpmHeader) (io.Reader, error) 
 		return bzip2.NewReader(r), nil
 	case "lzma", "xz":
 		return xz.NewReader(r, 0)
+	case "zstd":
+		return zstd.NewReader(r), nil
 	case "uncompressed":
 		return r, nil
 	default:

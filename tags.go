@@ -80,6 +80,9 @@ const (
 	TRIGGERFLAGS      = 1068 // bitmask: RPMSENSE_* are bitmasks to interpret
 	TRIGGERINDEX      = 1069
 	VERIFYSCRIPT      = 1079
+	CHANGELOGTIME     = 1080
+	CHANGELOGNAME     = 1081
+	CHANGELOGTEXT     = 1082
 	PREINPROG         = 1085
 	POSTINPROG        = 1086
 	PREUNPROG         = 1087

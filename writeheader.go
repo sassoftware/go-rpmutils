@@ -114,7 +114,9 @@ func (hdr *rpmHeader) WriteTo(outfile io.Writer, regionTag int) error {
 	if regionTag == RPMTAG_HEADERSIGNATURES {
 		alignment := totalSize % 8
 		if alignment != 0 {
-			outfile.Write(make([]byte, 8-alignment))
+			if _, err := outfile.Write(make([]byte, 8-alignment)); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

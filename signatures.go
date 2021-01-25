@@ -218,8 +218,10 @@ func rewriteRpm(infile *os.File, outpath string, header *RpmHeader) error {
 				if err != nil {
 					os.Remove(tempfile.Name())
 				} else {
-					tempfile.Chmod(0644)
-					tempfile.Close()
+					_ = tempfile.Chmod(0644)
+					if err = tempfile.Close(); err != nil {
+						return
+					}
 					err = os.Rename(tempfile.Name(), outpath)
 				}
 			}()
@@ -261,7 +263,9 @@ func writeRpm(infile io.ReadSeeker, outstream io.Writer, sigHeader *rpmHeader) e
 	if err != nil {
 		return err
 	}
-	_, err = outstream.Write(lead)
+	if _, err = outstream.Write(lead); err != nil {
+		return err
+	}
 	if err = sigHeader.WriteTo(outstream, RPMTAG_HEADERSIGNATURES); err != nil {
 		return err
 	}

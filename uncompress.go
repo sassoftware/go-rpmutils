@@ -17,11 +17,13 @@
 package rpmutils
 
 import (
+	"bytes"
 	"compress/bzip2"
 	"compress/gzip"
 	"fmt"
 	"io"
 
+	"github.com/ulikunitz/xz/lzma"
 	"github.com/xi2/xz"
 )
 
@@ -50,28 +52,44 @@ func uncompressRpmPayloadReader(r io.Reader, hdr *RpmHeader) (io.Reader, error) 
 		}
 		compression = val
 	} else {
-		b := make([]byte, 4096)
-		_, err := r.Read(b)
+		// peek at the start of the payload to see if it's compressed
+		b := make([]byte, 2)
+		_, err := io.ReadFull(r, b)
 		if err != nil {
 			return nil, err
 		}
-		if len(b) > 2 && b[0] == 0x1f && b[1] == 0x8b {
+		if b[0] == 0x1f && b[1] == 0x8b {
 			compression = "gzip"
 		} else {
 			compression = "uncompressed"
 		}
+		// splice the peeked bytes back in
+		r = io.MultiReader(bytes.NewReader(b), r)
 	}
 
 	switch compression {
+	case "zstd":
+		return newZstdReader(r)
 	case "gzip":
 		return gzip.NewReader(r)
 	case "bzip2":
 		return bzip2.NewReader(r), nil
-	case "lzma", "xz":
+	case "lzma":
+		return lzma.NewReader(r)
+	case "xz":
 		return xz.NewReader(r, 0)
 	case "uncompressed":
-		return r, nil
+		// prevent ExpandPayload from closing the underlying file
+		return noCloseWrapper{r}, nil
 	default:
 		return nil, fmt.Errorf("Unknown compression type %s", compression)
 	}
+}
+
+type noCloseWrapper struct {
+	r io.Reader
+}
+
+func (w noCloseWrapper) Read(d []byte) (int, error) {
+	return w.r.Read(d)
 }

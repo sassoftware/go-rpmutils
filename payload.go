@@ -24,6 +24,12 @@ import (
 	"github.com/sassoftware/go-rpmutils/cpio"
 )
 
+// TODO version 2:
+// - Make PayloadReader and FileInfo regular structs
+// - Promote IsLink to a method of FileInfo
+// - Add Close() that must be called to clean up decompressors
+
+// PayloadReader is used to sequentially access the file contents of a RPM payload
 type PayloadReader interface {
 	Next() (FileInfo, error)
 	Read([]byte) (int, error)
@@ -31,6 +37,7 @@ type PayloadReader interface {
 }
 
 type payloadReader struct {
+	stream  io.Reader
 	cr      *cpio.Reader
 	files   []*fileInfo
 	fileMap map[string]int
@@ -40,6 +47,7 @@ type payloadReader struct {
 
 func newPayloadReader(r io.Reader, files []FileInfo) *payloadReader {
 	pr := &payloadReader{
+		stream:  r,
 		files:   make([]*fileInfo, len(files)),
 		fileMap: make(map[string]int, len(files)),
 		isLink:  make([]bool, len(files)),
@@ -69,9 +77,16 @@ func newPayloadReader(r io.Reader, files []FileInfo) *payloadReader {
 	return pr
 }
 
+// Next returns the info of the next file in the payload. After calling Next(),
+// Read() can be used to read the contents of the file. Returns io.EOF when all
+// files have been consumed.
 func (pr *payloadReader) Next() (FileInfo, error) {
 	hdr, err := pr.cr.Next()
 	if err != nil {
+		// close decompressor on EOF, zstd in particular leaks goroutines otherwise
+		if c, ok := pr.stream.(io.Closer); ok {
+			c.Close()
+		}
 		return nil, err
 	}
 	var index int

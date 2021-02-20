@@ -7,6 +7,15 @@ go-rpmutils provides a few interfaces for handling RPM packages. There is a high
 
 ## Example
 ```go
+package main
+
+import (
+	"fmt"
+	"os"
+
+	rpmutils "github.com/sassoftware/go-rpmutils"
+)
+
 func main() {
     f, err := os.Open("foo.rpm")
     if err != nil {
@@ -14,7 +23,10 @@ func main() {
     }
 
     // Parse the rpm
-    rpm := rpmutils.ReadRpm(f)
+    rpm, err := rpmutils.ReadRpm(f)
+    if err != nil {
+        panic(err)
+    }
 
     // Get the name, epoch, version, release, and arch
     nevra, err := rpm.Header.GetNEVRA()

@@ -147,11 +147,16 @@ func readHeader(f io.Reader, hash string, isSource bool, sigBlock bool) (*rpmHea
 	}, nil
 }
 
+// HasTag returns true if the given tag exists in the header
 func (hdr *rpmHeader) HasTag(tag int) bool {
 	_, ok := hdr.entries[tag]
 	return ok
 }
 
+// Get the value of a tag. Returns whichever type most closely represents how
+// the tag was stored, or NoSuchTagError if the tag was not found. If tag is
+// OLDFILENAMES, special handling is provided to splice together DIRNAMES and
+// BASENAMES if it is not present.
 func (hdr *rpmHeader) Get(tag int) (interface{}, error) {
 	ent, ok := hdr.entries[tag]
 	if !ok && tag == OLDFILENAMES {
@@ -173,6 +178,9 @@ func (hdr *rpmHeader) Get(tag int) (interface{}, error) {
 	}
 }
 
+// GetStrings fetches the given tag holding a string or array of strings. If tag
+// is OLDFILENAMES, special handling is provided to splice together DIRNAMES and
+// BASENAMES if it is not present.
 func (hdr *rpmHeader) GetStrings(tag int) ([]string, error) {
 	ent, ok := hdr.entries[tag]
 	if tag == OLDFILENAMES && !ok {
@@ -233,9 +241,9 @@ func (hdr *rpmHeader) getInts(tag int) (buf interface{}, n int, err error) {
 	return
 }
 
-// Get an int array using the default 'int' type. DEPRECATED because all rpm
-// integers are unsigned, so some int32 values might not fit. Returns an error
-// in case of overflow.
+// GetInts gets an integer array using the default 'int' type.
+//
+// DEPRECATED: large int32s and int64s can overflow. Use GetUint32s or GetUint64s instead.
 func (hdr *rpmHeader) GetInts(tag int) ([]int, error) {
 	buf, n, err := hdr.getInts(tag)
 	if err != nil {
@@ -264,8 +272,8 @@ func (hdr *rpmHeader) GetInts(tag int) ([]int, error) {
 	return out, nil
 }
 
-// Get an int array as a uint32 slice. This can accomodate any int type other
-// than INT64.
+// GetUint32s gets an int array as a uint32 slice. This can accomodate any int
+// type other than INT64. Returns an error in case of overflow.
 func (hdr *rpmHeader) GetUint32s(tag int) ([]uint32, error) {
 	buf, n, err := hdr.getInts(tag)
 	if err != nil {
@@ -290,7 +298,8 @@ func (hdr *rpmHeader) GetUint32s(tag int) ([]uint32, error) {
 	return out, nil
 }
 
-// Get an int array as a uint64 slice. This can accomodate all int types.
+// GetUint64s gets an int array as a uint64 slice. This can accomodate all int
+// types.
 func (hdr *rpmHeader) GetUint64s(tag int) ([]uint64, error) {
 	buf, n, err := hdr.getInts(tag)
 	if err != nil {
@@ -317,15 +326,17 @@ func (hdr *rpmHeader) GetUint64s(tag int) ([]uint64, error) {
 	return out, nil
 }
 
-// Get longTag if it exists, otherwise intTag
+// GetUint64Fallback gets longTag if it exists, otherwise intTag, and returns
+// the value as an array of uint64s. This can accomodate all int types and is
+// normally used when a int32 tag was later replaced with a int64 tag.
 func (hdr *rpmHeader) GetUint64Fallback(intTag, longTag int) ([]uint64, error) {
 	if _, ok := hdr.entries[longTag]; ok {
 		return hdr.GetUint64s(longTag)
-	} else {
-		return hdr.GetUint64s(intTag)
 	}
+	return hdr.GetUint64s(intTag)
 }
 
+// GetBytes gets a tag as a byte array.
 func (hdr *rpmHeader) GetBytes(tag int) ([]byte, error) {
 	ent, ok := hdr.entries[tag]
 	if !ok {
@@ -337,6 +348,7 @@ func (hdr *rpmHeader) GetBytes(tag int) ([]byte, error) {
 	return ent.contents, nil
 }
 
+// GetNEVRA gets the name, epoch, version, release and arch of the RPM.
 func (hdr *rpmHeader) GetNEVRA() (*NEVRA, error) {
 	name, err := hdr.GetStrings(NAME)
 	if err != nil {

@@ -23,6 +23,7 @@ import (
 	"syscall"
 )
 
+// HasLinks returns true if the given file has Nlink > 1
 func HasLinks(info os.FileInfo) bool {
 	stat, ok := info.Sys().(*syscall.Stat_t)
 	if !ok {
@@ -31,6 +32,7 @@ func HasLinks(info os.FileInfo) bool {
 	return stat.Nlink != 1
 }
 
+// Mkfifo creates a named pipe with the specified path and permissions
 func Mkfifo(path string, mode uint32) error {
 	return syscall.Mkfifo(path, mode)
 }

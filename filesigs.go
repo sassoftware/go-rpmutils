@@ -16,8 +16,8 @@
 
 package rpmutils
 
+// PGP Hash Algorithms
 const (
-	// PGP Hash Algorithms
 	PGPHASHALGO_MD5         = 1  // MD5
 	PGPHASHALGO_SHA1        = 2  // SHA1
 	PGPHASHALGO_RIPEMD160   = 3  // RIPEMD160
@@ -30,6 +30,7 @@ const (
 	PGPHASHALGO_SHA224      = 11 // SHA224
 )
 
+// GetFileAlgoName returns the name of a digest algorithm
 func GetFileAlgoName(algo int) string {
 	switch algo {
 	case PGPHASHALGO_MD5:

@@ -32,25 +32,26 @@ import (
 	"golang.org/x/crypto/openpgp/packet"
 )
 
+// SignatureOptions describes additional configuration for SignRpm methods
 type SignatureOptions struct {
-	Hash         crypto.Hash
+	// Hash algorithm for the signature. If not set, defaults to SHA-256
+	Hash crypto.Hash
+	// CreationTime for the signature. If not set, defaults to the current time
 	CreationTime time.Time
 }
 
 func (opts *SignatureOptions) hash() crypto.Hash {
 	if opts != nil {
 		return opts.Hash
-	} else {
-		return crypto.SHA256
 	}
+	return crypto.SHA256
 }
 
 func (opts *SignatureOptions) creationTime() time.Time {
 	if opts != nil {
 		return opts.CreationTime
-	} else {
-		return time.Now()
 	}
+	return time.Now()
 }
 
 func makeSignature(stream io.Reader, key *packet.PrivateKey, opts *SignatureOptions) ([]byte, error) {
@@ -110,7 +111,7 @@ func checkMd5(sigHeader *rpmHeader, h hash.Hash) bool {
 	return bytes.Equal(sigmd5, h.Sum(nil))
 }
 
-// Read an RPM and sign it, returning the set of headers updated with the new signature.
+// SignRpmStream reads an RPM and signs it, returning the set of headers updated with the new signature.
 func SignRpmStream(stream io.Reader, key *packet.PrivateKey, opts *SignatureOptions) (header *RpmHeader, err error) {
 	lead, sigHeader, err := readSignatureHeader(stream)
 	if err != nil {
@@ -161,6 +162,7 @@ func canOverwrite(ininfo, outinfo os.FileInfo) bool {
 	return true
 }
 
+// SignRpmFile signs infile and writes it to outpath, which may be the same file
 func SignRpmFile(infile *os.File, outpath string, key *packet.PrivateKey, opts *SignatureOptions) (header *RpmHeader, err error) {
 	header, err = SignRpmStream(infile, key, opts)
 	if err != nil {
@@ -169,6 +171,10 @@ func SignRpmFile(infile *os.File, outpath string, key *packet.PrivateKey, opts *
 	return header, rewriteRpm(infile, outpath, header)
 }
 
+// RewriteWithSignatures inserts raw signatures into a RPM header.
+//
+// DEPRECATED: To perform a detached signature, use SignRpmStream and call
+// DumpSignatureHeader to export the result.
 func RewriteWithSignatures(infile *os.File, outpath string, sigPgp, sigRsa []byte) (*RpmHeader, error) {
 	header, err := ReadHeader(infile)
 	if err != nil {

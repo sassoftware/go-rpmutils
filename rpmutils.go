@@ -25,11 +25,17 @@ import (
 	"github.com/sassoftware/go-rpmutils/cpio"
 )
 
+// Rpm is an open RPM header and payload
 type Rpm struct {
 	Header *RpmHeader
 	f      io.Reader
 }
 
+// RpmHeader holds the signature header and general header of a RPM
+//
+// Tags are drawn from both header areas, with IDs between _GENERAL_TAG_BASE and
+// _SIGHEADER_TAG_BASE coming from the general header and all others coming from
+// the signature header.
 type RpmHeader struct {
 	lead      []byte
 	sigHeader *rpmHeader
@@ -37,6 +43,7 @@ type RpmHeader struct {
 	isSource  bool
 }
 
+// ReadRpm reads the header from a RPM file and prepares to read payload contents
 func ReadRpm(f io.Reader) (*Rpm, error) {
 	hdr, err := ReadHeader(f)
 	if err != nil {
@@ -84,6 +91,9 @@ func (rpm *Rpm) PayloadReaderExtended() (PayloadReader, error) {
 	return newPayloadReader(pld, files), nil
 }
 
+// ReadHeader reads the signature and general headers from a RPM.
+//
+// The stream is positioned for reading the compressed payload following the headers.
 func ReadHeader(f io.Reader) (*RpmHeader, error) {
 	lead, sigHeader, err := readSignatureHeader(f)
 	if err != nil {
@@ -124,11 +134,15 @@ func readSignatureHeader(f io.Reader) ([]byte, *rpmHeader, error) {
 	return lead, hdr, err
 }
 
+// HeaderRange indicates the byte offsets that the RPM header spans
 type HeaderRange struct {
+	// Start is the byte offset of the signature header
 	Start int
-	End   int
+	// End is the byte offset of the end of the general header and start of the payload
+	End int
 }
 
+// GetRange returns the byte offsets that the RPM header spans within the original RPM file
 func (hdr *RpmHeader) GetRange() HeaderRange {
 	start := 96 + hdr.sigHeader.origSize
 	end := start + hdr.genHeader.origSize
@@ -138,16 +152,22 @@ func (hdr *RpmHeader) GetRange() HeaderRange {
 	}
 }
 
+// HasTag returns true if the given tag exists in the header
 func (hdr *RpmHeader) HasTag(tag int) bool {
 	h, t := hdr.getHeader(tag)
 	return h.HasTag(t)
 }
 
+// Get the value of a tag. Returns whichever type most closely represents how
+// the tag was stored, or NoSuchTagError if the tag was not found. If tag is
+// OLDFILENAMES, special handling is provided to splice together DIRNAMES and
+// BASENAMES if it is not present.
 func (hdr *RpmHeader) Get(tag int) (interface{}, error) {
 	h, t := hdr.getHeader(tag)
 	return h.Get(t)
 }
 
+// GetString returns the value of a tag holding a single string
 func (hdr *RpmHeader) GetString(tag int) (string, error) {
 	vals, err := hdr.GetStrings(tag)
 	if err != nil {
@@ -159,11 +179,17 @@ func (hdr *RpmHeader) GetString(tag int) (string, error) {
 	return vals[0], nil
 }
 
+// GetStrings fetches the given tag holding a string or array of strings. If tag
+// is OLDFILENAMES, special handling is provided to splice together DIRNAMES and
+// BASENAMES if it is not present.
 func (hdr *RpmHeader) GetStrings(tag int) ([]string, error) {
 	h, t := hdr.getHeader(tag)
 	return h.GetStrings(t)
 }
 
+// GetInt gets an integer using the default 'int' type.
+//
+// DEPRECATED: large int32s and int64s can overflow. Use GetUint32s or GetUint64s instead.
 func (hdr *RpmHeader) GetInt(tag int) (int, error) {
 	vals, err := hdr.GetInts(tag)
 	if err != nil {
@@ -175,11 +201,31 @@ func (hdr *RpmHeader) GetInt(tag int) (int, error) {
 	return vals[0], nil
 }
 
+// GetInts gets an integer array using the default 'int' type.
+//
+// DEPRECATED: large int32s and int64s can overflow. Use GetUint32s or GetUint64s instead.
 func (hdr *RpmHeader) GetInts(tag int) ([]int, error) {
 	h, t := hdr.getHeader(tag)
 	return h.GetInts(t)
 }
 
+// GetUint32s gets an int array as a uint32 slice. This can accomodate any int
+// type other than INT64. Returns an error in case of overflow.
+func (hdr *RpmHeader) GetUint32s(tag int) ([]uint32, error) {
+	h, t := hdr.getHeader(tag)
+	return h.GetUint32s(t)
+}
+
+// GetUint64s gets an int array as a uint64 slice. This can accomodate all int
+// types
+func (hdr *RpmHeader) GetUint64s(tag int) ([]uint64, error) {
+	h, t := hdr.getHeader(tag)
+	return h.GetUint64s(t)
+}
+
+// GetUint64Fallback gets longTag if it exists, otherwise intTag, and returns
+// the value as an array of uint64s. This can accomodate all int types and is
+// normally used when a int32 tag was later replaced with a int64 tag.
 func (hdr *RpmHeader) GetUint64Fallback(intTag, longTag int) (uint64, error) {
 	h, t := hdr.getHeader(longTag)
 	vals, err := h.GetUint64s(t)
@@ -196,11 +242,15 @@ func (hdr *RpmHeader) GetUint64Fallback(intTag, longTag int) (uint64, error) {
 	return vals[0], nil
 }
 
+// GetBytes gets a tag as a byte array.
 func (hdr *RpmHeader) GetBytes(tag int) ([]byte, error) {
 	h, t := hdr.getHeader(tag)
 	return h.GetBytes(t)
 }
 
+// getHeader decides whether the conventional tag ID is within the signature
+// header range and returns the appropriate sub-header struct and raw tag
+// identifier
 func (hdr *RpmHeader) getHeader(tag int) (*rpmHeader, int) {
 	if tag > _SIGHEADER_TAG_BASE {
 		return hdr.sigHeader, tag - _SIGHEADER_TAG_BASE
@@ -211,15 +261,18 @@ func (hdr *RpmHeader) getHeader(tag int) (*rpmHeader, int) {
 	return hdr.genHeader, tag
 }
 
+// GetNEVRA gets the name, epoch, version, release and arch of the RPM.
 func (hdr *RpmHeader) GetNEVRA() (*NEVRA, error) {
 	return hdr.genHeader.GetNEVRA()
 }
 
+// GetFiles returns an array of FileInfo objects holding file-related attributes
+// held in parallel arrays of tags
 func (hdr *RpmHeader) GetFiles() ([]FileInfo, error) {
 	return hdr.genHeader.GetFiles()
 }
 
-// Return the approximate disk space needed to install the package
+// InstalledSize returns the approximate disk space needed to install the package
 func (hdr *RpmHeader) InstalledSize() (int64, error) {
 	u, err := hdr.GetUint64Fallback(SIZE, LONGSIZE)
 	if err != nil {
@@ -228,7 +281,7 @@ func (hdr *RpmHeader) InstalledSize() (int64, error) {
 	return int64(u), nil
 }
 
-// Return the size of the uncompressed payload in bytes
+// PayloadSize returns the size of the uncompressed payload in bytes
 func (hdr *RpmHeader) PayloadSize() (int64, error) {
 	u, err := hdr.sigHeader.GetUint64Fallback(SIG_PAYLOADSIZE-_SIGHEADER_TAG_BASE, SIG_LONGARCHIVESIZE)
 	if err != nil {

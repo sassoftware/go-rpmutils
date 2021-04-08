@@ -110,10 +110,14 @@ func (pr *payloadReader) Next() (FileInfo, error) {
 	return pr.files[index], nil
 }
 
+// Read bytes from the file returned by the preceding call to Next()
 func (pr *payloadReader) Read(d []byte) (int, error) {
 	return pr.cr.Read(d)
 }
 
+// IsLink returns true if the current file is a hard-link with no contents. A
+// subsequent file with the same FileInfo.Inode and for which IsLink() returns
+// false will have the contents.
 func (pr *payloadReader) IsLink() bool {
 	return pr.isLink[pr.index]
 }

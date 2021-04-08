@@ -18,24 +18,31 @@ package cpio
 
 import "io"
 
+// Reader accesses a cpio archive stream using a simple interface similar to the archive/tar package
 type Reader struct {
-	stream  *CpioStream
-	cur_ent *CpioEntry
+	stream *CpioStream
+	cur    *CpioEntry
 }
 
+// NewReader starts reading a cpio archive stream
 func NewReader(stream io.Reader) *Reader {
 	return NewReaderWithSizes(stream, nil)
 }
 
+// NewReaderWithSizes starts reading a stripped cpio archive from a RPM payload using the provided file sizes
 func NewReaderWithSizes(stream io.Reader, sizes []int64) *Reader {
 	cstream := NewCpioStream(stream)
 	cstream.SetFileSizes(sizes)
 	return &Reader{
-		stream:  cstream,
-		cur_ent: nil,
+		stream: cstream,
+		cur:    nil,
 	}
 }
 
+// Next returns the metadata of the next file in the archive, which can then be
+// read with Read().
+//
+// Returns io.EOF upon encountering the archive trailer.
 func (r *Reader) Next() (*Cpio_newc_header, error) {
 	ent, err := r.stream.ReadNextEntry()
 	if err != nil {
@@ -43,10 +50,13 @@ func (r *Reader) Next() (*Cpio_newc_header, error) {
 	} else if ent.Header.filename == TRAILER {
 		return nil, io.EOF
 	}
-	r.cur_ent = ent
-	return r.cur_ent.Header, nil
+	r.cur = ent
+	return r.cur.Header, nil
 }
 
+// Read bytes from the file returned by the preceding call to Next().
+//
+// Returns io.EOF when the current file has been read in its entirety.
 func (r *Reader) Read(p []byte) (n int, err error) {
-	return r.cur_ent.payload.Read(p)
+	return r.cur.payload.Read(p)
 }

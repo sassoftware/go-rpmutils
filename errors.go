@@ -18,6 +18,7 @@ package rpmutils
 
 import "fmt"
 
+// NoSuchTagError is returned when a tag does not exist in the header
 type NoSuchTagError struct {
 	Tag int
 }
@@ -26,6 +27,7 @@ func (err NoSuchTagError) Error() string {
 	return fmt.Sprintf("No such entry %d", err.Tag)
 }
 
+// NewNoSuchTagError creates a NoSuchTagError for a given tag
 func NewNoSuchTagError(tag int) NoSuchTagError {
 	return NoSuchTagError{Tag: tag}
 }

@@ -36,17 +36,30 @@ var payloadSigTags = []int{
 	SIG_GPG - _SIGHEADER_TAG_BASE,
 }
 
+// Signature describes a PGP signature found within a RPM while verifying it.
 type Signature struct {
-	Signer       *openpgp.Entity
-	Hash         crypto.Hash
+	// Signer is the PGP identity that created the signature. It may be nil if
+	// the public key is not available at verification time, but KeyId will
+	// always be set.
+	Signer *openpgp.Entity
+	// Hash is the algorithm used to digest the signature contents
+	Hash crypto.Hash
+	// CreationTime is when the signature was created
 	CreationTime time.Time
-	HeaderOnly   bool
-	KeyId        uint64
+	// HeaderOnly is true for signatures that only cover the general RPM header,
+	// and false for signatures that cover the general header plus the payload
+	HeaderOnly bool
+	// KeyId is the PGP key that created the signature.
+	KeyId uint64
 
 	packet packet.Packet
 	hash   hash.Hash
 }
 
+// Verify the PGP signature over a RPM file. knownKeys should enumerate public
+// keys to check against, otherwise the signature validity cannot be verified.
+// If knownKeys is nil then digests will be checked but only the raw key ID will
+// be available.
 func Verify(stream io.Reader, knownKeys openpgp.EntityList) (header *RpmHeader, sigs []*Signature, err error) {
 	lead, sigHeader, err := readSignatureHeader(stream)
 	if err != nil {

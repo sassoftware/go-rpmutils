@@ -21,6 +21,7 @@ import (
 	"sort"
 )
 
+// NEVRA holds the name, epoch, version, release and arch of the RPM, which uniquely identifies it
 type NEVRA struct {
 	Name    string
 	Epoch   string
@@ -35,6 +36,7 @@ func (nevra *NEVRA) String() string {
 	return fmt.Sprintf("%s-%s:%s-%s.%s.rpm", nevra.Name, nevra.Epoch, nevra.Version, nevra.Release, nevra.Arch)
 }
 
+// NEVRAcmp compares two RPM versions. It returns -1 if a < b, 1 if a > b, and 0 if a == b
 func NEVRAcmp(a NEVRA, b NEVRA) int {
 	if res := Vercmp(a.Epoch, b.Epoch); res != 0 {
 		return res
@@ -48,6 +50,7 @@ func NEVRAcmp(a NEVRA, b NEVRA) int {
 	return 0
 }
 
+// NEVRASlice is used to sort a list of NEVRAs and implements sort.Interface
 type NEVRASlice []NEVRA
 
 func (s NEVRASlice) Len() int {
@@ -64,6 +67,7 @@ func (s NEVRASlice) Swap(i, j int) {
 	s[j] = n
 }
 
+// Sort a list of NEVRAs in-place
 func (s NEVRASlice) Sort() {
 	sort.Sort(s)
 }

@@ -22,44 +22,52 @@ import (
 	"io"
 )
 
+// TRAILER is the filename found on the last entry of a cpio archive
 const TRAILER = "TRAILER!!!"
 
+// ErrStrippedHeader indicates that a RPM-style archive was read without calling SetFileSizes()
 var ErrStrippedHeader = errors.New("invalid cpio header: rpm-style stripped cpio requires supplemental size info")
 
+// CpioEntry points to a single file within a cpio stream
 type CpioEntry struct {
 	Header  *Cpio_newc_header
 	payload *file_stream
 }
 
+// CpioStream reads file metadata and contents from a cpio archive
 type CpioStream struct {
-	stream   *countingReader
-	next_pos int64
-	sizes    []int64
+	stream  *countingReader
+	nextPos int64
+	sizes   []int64
 }
 
 type countingReader struct {
-	stream   io.Reader
-	curr_pos int64
+	stream io.Reader
+	curPos int64
 }
 
+// NewCpioStream starts reading files from a cpio archive
 func NewCpioStream(stream io.Reader) *CpioStream {
 	return &CpioStream{
 		stream: &countingReader{
-			stream:   stream,
-			curr_pos: 0,
+			stream: stream,
+			curPos: 0,
 		},
-		next_pos: 0,
+		nextPos: 0,
 	}
 }
 
-// Provide supplemental file size info so that RPMs with files > 4GiB can be read
+// SetFileSizes provides supplemental file size info so that RPMs with files > 4GiB can be read
 func (cs *CpioStream) SetFileSizes(sizes []int64) {
 	cs.sizes = sizes
 }
 
+// ReadNextEntry returns the metadata of the next file in the archive.
+//
+// The final file in the archive can be detected by checking for a Filename of TRAILER.
 func (cs *CpioStream) ReadNextEntry() (*CpioEntry, error) {
-	if cs.next_pos != cs.stream.curr_pos {
-		_, err := cs.stream.Seek(cs.next_pos-cs.stream.curr_pos, 1)
+	if cs.nextPos != cs.stream.curPos {
+		_, err := cs.stream.Seek(cs.nextPos-cs.stream.curPos, 1)
 		if err != nil {
 			return nil, err
 		}
@@ -74,14 +82,14 @@ func (cs *CpioStream) ReadNextEntry() (*CpioEntry, error) {
 	}
 
 	// Read filename
-	buf := make([]byte, hdr.c_namesize)
+	buf := make([]byte, hdr.namesize)
 	if _, err = io.ReadFull(cs.stream, buf); err != nil {
 		return nil, err
 	}
 
 	filename := string(buf[:len(buf)-1])
 
-	offset := pad(cpio_newc_header_length+int(hdr.c_namesize)) - cpio_newc_header_length - int(hdr.c_namesize)
+	offset := pad(newcHeaderLength+int(hdr.namesize)) - newcHeaderLength - int(hdr.namesize)
 
 	if offset > 0 {
 		_, err := cs.stream.Seek(int64(offset), 1)
@@ -91,10 +99,10 @@ func (cs *CpioStream) ReadNextEntry() (*CpioEntry, error) {
 	}
 
 	// Find the next entry
-	cs.next_pos = pad64(cs.stream.curr_pos + int64(hdr.c_filesize))
+	cs.nextPos = pad64(cs.stream.curPos + int64(hdr.filesize))
 
 	// Find the payload
-	payload, err := newFileStream(cs.stream, int64(hdr.c_filesize))
+	payload, err := newFileStream(cs.stream, int64(hdr.filesize))
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +125,7 @@ func (cs *CpioStream) readStrippedEntry(hdr *Cpio_newc_header) (*CpioEntry, erro
 		return nil, fmt.Errorf("stripped cpio refers to invalid file index %d", hdr.index)
 	}
 	size := cs.sizes[hdr.index]
-	cs.next_pos = pad64(cs.stream.curr_pos + size)
+	cs.nextPos = pad64(cs.stream.curPos + size)
 	payload, err := newFileStream(cs.stream, size)
 	if err != nil {
 		return nil, err
@@ -127,7 +135,7 @@ func (cs *CpioStream) readStrippedEntry(hdr *Cpio_newc_header) (*CpioEntry, erro
 
 func (cr *countingReader) Read(p []byte) (n int, err error) {
 	n, err = cr.stream.Read(p)
-	cr.curr_pos += int64(n)
+	cr.curPos += int64(n)
 	return
 }
 
@@ -136,7 +144,7 @@ func (cr *countingReader) Seek(offset int64, whence int) (int64, error) {
 		return 0, fmt.Errorf("only seeking from current location supported")
 	}
 	if offset == 0 {
-		return cr.curr_pos, nil
+		return cr.curPos, nil
 	}
 	b := make([]byte, offset)
 	n, err := io.ReadFull(cr, b)

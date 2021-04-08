@@ -16,6 +16,7 @@
 
 package rpmutils
 
+// FileInfo describes a file in the RPM payload
 type FileInfo interface {
 	Name() string
 	Size() int64
@@ -44,46 +45,57 @@ type fileInfo struct {
 	inode     uint32
 }
 
+// Name returns the full path of the file
 func (fi *fileInfo) Name() string {
 	return fi.name
 }
 
+// Size of the file in bytes
 func (fi *fileInfo) Size() int64 {
 	return int64(fi.size)
 }
 
+// UserName returns the file's owner user name
 func (fi *fileInfo) UserName() string {
 	return fi.userName
 }
 
+// GroupName returns the file's owner group name
 func (fi *fileInfo) GroupName() string {
 	return fi.groupName
 }
 
+// Flags returns RPM-specific file flags (config, ghost etc.)
 func (fi *fileInfo) Flags() int {
 	return int(fi.flags)
 }
 
+// Mtime returns the modification time of the file as a UNIX epoch time
 func (fi *fileInfo) Mtime() int {
 	return int(fi.mtime)
 }
 
+// Digest of the file, according to FILEDIGESTALGO
 func (fi *fileInfo) Digest() string {
 	return fi.digest
 }
 
+// Mode of the file, holding both permissions and file type
 func (fi *fileInfo) Mode() int {
 	return int(fi.mode)
 }
 
+// Linkname returns the target of a symlink
 func (fi *fileInfo) Linkname() string {
 	return fi.linkName
 }
 
+// Device returns the major and minor device number of a character or block device
 func (fi *fileInfo) Device() int {
 	return int(fi.device)
 }
 
+// Inode returns a inode number used to tie hardlinked files together
 func (fi *fileInfo) Inode() int {
 	return int(fi.inode)
 }

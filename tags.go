@@ -16,6 +16,7 @@
 
 package rpmutils
 
+// tag data types
 const (
 	RPM_NULL_TYPE         = 0
 	RPM_CHAR_TYPE         = 1
@@ -27,7 +28,10 @@ const (
 	RPM_BIN_TYPE          = 7
 	RPM_STRING_ARRAY_TYPE = 8
 	RPM_I18NSTRING_TYPE   = 9
+)
 
+// RPM header tags found in the general header
+const (
 	_GENERAL_TAG_BASE = 1000
 	NAME              = 1000
 	VERSION           = 1001
@@ -118,7 +122,10 @@ const (
 	BUGURL         = 5012
 	VCS            = 5034
 	ENCODING       = 5062
+)
 
+// RPM header tags found in the signature header
+const (
 	SIG_BASE            = 256
 	SIG_DSA             = SIG_BASE + 11 // DSA signature over header only
 	SIG_RSA             = SIG_BASE + 12 // RSA signature over header only
@@ -135,8 +142,10 @@ const (
 	SIG_GPG             = _SIGHEADER_TAG_BASE + 1005 // (same as SIG_PGP)
 	SIG_PAYLOADSIZE     = _SIGHEADER_TAG_BASE + 1007 // uncompressed payload bytes (uint32)
 	SIG_RESERVEDSPACE   = _SIGHEADER_TAG_BASE + 1008 // blank space that can be replaced by a signature
+)
 
-	// FILEFLAGS bitmask elements:
+// FILEFLAGS bitmask elements
+const (
 	RPMFILE_NONE      = 0
 	RPMFILE_CONFIG    = 1 << 0
 	RPMFILE_DOC       = 1 << 1
@@ -151,8 +160,10 @@ const (
 	RPMFILE_UNPATCHED = 1 << 10
 	RPMFILE_PUBKEY    = 1 << 11
 	RPMFILE_POLICY    = 1 << 12
+)
 
-	// FILEVERIFYFLAGS bitmask elements:
+// FILEVERIFYFLAGS bitmask elements
+const (
 	RPMVERIFY_NONE       = 0
 	RPMVERIFY_MD5        = 1 << 0
 	RPMVERIFY_FILEDIGEST = 1 << 0
@@ -165,9 +176,10 @@ const (
 	RPMVERIFY_RDEV       = 1 << 7
 	RPMVERIFY_CAPS       = 1 << 8
 	RPMVERIFY_CONTEXTS   = 1 << 15
+)
 
-	// TRIGGERFLAGS bitmask elements -- not all rpmsenseFlags make sense
-	// in TRIGGERFLAGS
+// TRIGGERFLAGS bitmask elements -- not all rpmsenseFlags make sense in TRIGGERFLAGS
+const (
 	RPMSENSE_ANY           = 0
 	RPMSENSE_LESS          = 1 << 1
 	RPMSENSE_GREATER       = 1 << 2
@@ -176,8 +188,10 @@ const (
 	RPMSENSE_TRIGGERUN     = 1 << 17
 	RPMSENSE_TRIGGERPOSTUN = 1 << 18
 	RPMSENSE_TRIGGERPREIN  = 1 << 25
+)
 
-	// Header region tags
+// Header region tags
+const (
 	RPMTAG_HEADERSIGNATURES = 62
 	RPMTAG_HEADERIMMUTABLE  = 63
 	RPMTAG_HEADERREGIONS    = 64

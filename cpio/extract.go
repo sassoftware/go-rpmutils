@@ -92,7 +92,7 @@ func Extract(rs io.Reader, dest string) error {
 				return err
 			}
 		case S_ISLNK:
-			buf := make([]byte, entry.Header.c_filesize)
+			buf := make([]byte, entry.Header.filesize)
 			if _, err := entry.payload.Read(buf); err != nil {
 				return err
 			}
@@ -101,13 +101,13 @@ func Extract(rs io.Reader, dest string) error {
 			}
 		case S_ISREG:
 			// save hardlinks until after the taget is written
-			if entry.Header.c_nlink > 1 && entry.Header.c_filesize == 0 {
-				l, ok := linkMap[entry.Header.c_ino]
+			if entry.Header.nlink > 1 && entry.Header.filesize == 0 {
+				l, ok := linkMap[entry.Header.ino]
 				if !ok {
 					l = make([]string, 0)
 				}
 				l = append(l, target)
-				linkMap[entry.Header.c_ino] = l
+				linkMap[entry.Header.ino] = l
 				continue
 			}
 
@@ -120,7 +120,7 @@ func Extract(rs io.Reader, dest string) error {
 			if err != nil {
 				return err
 			}
-			if written != int64(entry.Header.c_filesize) {
+			if written != int64(entry.Header.filesize) {
 				return fmt.Errorf("short write")
 			}
 			if err := f.Close(); err != nil {
@@ -128,8 +128,8 @@ func Extract(rs io.Reader, dest string) error {
 			}
 
 			// Create hardlinks after the file content is written.
-			if entry.Header.c_nlink > 1 && entry.Header.c_filesize > 0 {
-				l, ok := linkMap[entry.Header.c_ino]
+			if entry.Header.nlink > 1 && entry.Header.filesize > 0 {
+				l, ok := linkMap[entry.Header.ino]
 				if !ok {
 					return fmt.Errorf("hardlinks missing")
 				}
@@ -142,7 +142,7 @@ func Extract(rs io.Reader, dest string) error {
 			}
 		default:
 			return fmt.Errorf("unknown file mode 0%o for %s",
-				entry.Header.c_mode, entry.Header.filename)
+				entry.Header.mode, entry.Header.filename)
 		}
 	}
 

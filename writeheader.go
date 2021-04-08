@@ -67,7 +67,7 @@ func writeRegion(entries io.Writer, blobs *bytes.Buffer, regionTag int, tagCount
 	return writeTag(entries, blobs, regionTag, regionEntry)
 }
 
-// Write the header out, adding a region tag encompassing all the existing tags.
+// WriteTo writes the header out, adding a region tag encompassing all the existing tags
 func (hdr *rpmHeader) WriteTo(outfile io.Writer, regionTag int) error {
 	if regionTag != 0 && regionTag >= RPMTAG_HEADERREGIONS {
 		return errors.New("invalid region tag")
@@ -137,13 +137,18 @@ func (sink *byteCountSink) Write(data []byte) (int, error) {
 	return len(data), nil
 }
 
+// OriginalSignatureHeaderSize returns the size of the lead and signature header
+// area as originally read from the file.
 func (hdr *RpmHeader) OriginalSignatureHeaderSize() int {
 	return hdr.sigHeader.origSize + 96
 }
 
-// Dump the lead and signature header, optionally adding or changing padding to
-// make it the same size as when it was originally read. Otherwise padding is
-// removed to make it as small as possible.
+// DumpSignatureHeader dumps the lead and signature header, optionally adding or
+// changing padding to make it the same size as when it was originally read.
+// Otherwise padding is removed to make it as small as possible.
+//
+// A RPM can be signed by removing the first OriginalSignatureHeaderSize() bytes
+// of the file and replacing it with the result of DumpSignatureHeader().
 func (hdr *RpmHeader) DumpSignatureHeader(sameSize bool) ([]byte, error) {
 	if len(hdr.lead) != 96 {
 		return nil, errors.New("invalid or missing RPM lead")

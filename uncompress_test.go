@@ -43,3 +43,15 @@ func TestUncompress(t *testing.T) {
 		})
 	}
 }
+
+func TestUncompressEmpty(t *testing.T) {
+	f, err := os.Open("testdata/empty-0.1-1.x86_64.rpm")
+	require.NoError(t, err)
+	defer f.Close()
+	rpm, err := ReadRpm(f)
+	require.NoError(t, err)
+	payload, err := rpm.PayloadReaderExtended()
+	require.NoError(t, err)
+	_, err = payload.Next()
+	assert.ErrorIs(t, err, io.EOF)
+}

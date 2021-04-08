@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"path"
@@ -369,10 +370,18 @@ func (hdr *rpmHeader) GetNEVRA() (*NEVRA, error) {
 	}, nil
 }
 
+// GetFiles returns an array of FileInfo objects holding file-related attributes
+// held in parallel arrays of tags
+//
+// If the RPM has no files, GetFiles returns an empty list.
 func (hdr *rpmHeader) GetFiles() ([]FileInfo, error) {
 	paths, err := hdr.GetStrings(OLDFILENAMES)
 	if err != nil {
-		return nil, err
+		if !errors.As(err, &NoSuchTagError{}) {
+			return nil, err
+		}
+		// RPM has no files
+		return nil, nil
 	}
 	fileSizes, err := hdr.GetUint64Fallback(FILESIZES, LONGFILESIZES)
 	if err != nil {

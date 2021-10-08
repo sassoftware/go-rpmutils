@@ -26,8 +26,8 @@ import (
 	"io"
 	"time"
 
-	"golang.org/x/crypto/openpgp"
-	"golang.org/x/crypto/openpgp/packet"
+	"github.com/ProtonMail/go-crypto/openpgp"
+	"github.com/ProtonMail/go-crypto/openpgp/packet"
 )
 
 var headerSigTags = []int{SIG_RSA, SIG_DSA}
@@ -119,12 +119,6 @@ func setupDigester(sigHeader *rpmHeader, tag int) (*Signature, error) {
 	}
 	var sig *Signature
 	switch pkt := genpkt.(type) {
-	case *packet.SignatureV3:
-		sig = &Signature{
-			Hash:         pkt.Hash,
-			CreationTime: pkt.CreationTime,
-			KeyId:        pkt.IssuerKeyId,
-		}
 	case *packet.Signature:
 		if pkt.IssuerKeyId == nil {
 			return nil, errors.New("Missing keyId in signature")
@@ -191,8 +185,6 @@ func checkSig(sig *Signature, knownKeys openpgp.EntityList) error {
 	switch pkt := sig.packet.(type) {
 	case *packet.Signature:
 		err = key.PublicKey.VerifySignature(sig.hash, pkt)
-	case *packet.SignatureV3:
-		err = key.PublicKey.VerifySignatureV3(sig.hash, pkt)
 	}
 	if err != nil {
 		return err

@@ -58,7 +58,7 @@ func TestUncompressEmpty(t *testing.T) {
 	assert.ErrorIs(t, err, io.EOF)
 }
 
-func TestUncompressSizesAndChecksums(t *testing.T) {
+func TestUncompressSizesAndChecksumsWithPayloadReaderExtended(t *testing.T) {
 	files := []string{
 		"testdata/crypto-policies-20210617-1.gitc776d3e.el8.noarch.rpm",
 		"testdata/glibc-all-langpacks-2.28-164.el8.aarch64.rpm",
@@ -82,6 +82,53 @@ func TestUncompressSizesAndChecksums(t *testing.T) {
 				break
 			}
 			require.NoError(t, err)
+
+			data, err := io.ReadAll(payload)
+			require.NoError(t, err)
+			require.Equal(t, int(file.Size()), len(data))
+
+			if file.Size() > 0 {
+				checksum := sha256.Sum256(data)
+				require.Equal(t, file.Digest(), hex.EncodeToString(checksum[:]))
+			}
+		}
+	}
+}
+
+func TestUncompressSizesAndChecksumsWithPayloadReader(t *testing.T) {
+	files := []string{
+		"testdata/crypto-policies-20210617-1.gitc776d3e.el8.noarch.rpm",
+		"testdata/glibc-all-langpacks-2.28-164.el8.aarch64.rpm",
+	}
+
+	for _, file := range files {
+		f, err := os.Open(file)
+		require.NoError(t, err)
+		defer f.Close()
+		rpm, err := ReadRpm(f)
+		require.NoError(t, err)
+		digestAlgo, err := rpm.Header.GetInts(FILEDIGESTALGO)
+		require.NoError(t, err)
+		require.Equal(t, []int{PGPHASHALGO_SHA256}, digestAlgo)
+		files, err := rpm.Header.GetFiles()
+		require.NoError(t, err)
+		payload, err := rpm.PayloadReader()
+		require.NoError(t, err)
+
+		for {
+			h, err := payload.Next()
+			if err == io.EOF {
+				break
+			}
+			require.NoError(t, err)
+
+			var file FileInfo
+			for _, f := range files {
+				if filepath.Join("/", h.Filename()) == f.Name() {
+					file = f
+				}
+			}
+			require.NotNil(t, f)
 
 			data, err := io.ReadAll(payload)
 			require.NoError(t, err)

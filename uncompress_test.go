@@ -83,9 +83,12 @@ func TestUncompressSizesAndChecksumsWithPayloadReaderExtended(t *testing.T) {
 			}
 			require.NoError(t, err)
 
+			if file.Name() == "/usr/share/crypto-policies/DEFAULT/bind.txt" {
+				t.Log("debug")
+			}
 			data, err := io.ReadAll(payload)
 			require.NoError(t, err)
-			require.Equal(t, int(file.Size()), len(data))
+			require.Equal(t, int(file.Size()), len(data), "wrong size read for %q", file.Name())
 
 			if file.Size() > 0 {
 				checksum := sha256.Sum256(data)
@@ -114,6 +117,14 @@ func TestUncompressSizesAndChecksumsWithPayloadReader(t *testing.T) {
 		require.NoError(t, err)
 		payload, err := rpm.PayloadReader()
 		require.NoError(t, err)
+
+		if rpm.Header.HasTag(PAYLOADCOMPRESSOR) {
+			cmp, err := rpm.Header.GetString(PAYLOADCOMPRESSOR)
+			require.NoError(t, err)
+			t.Log(cmp)
+		} else {
+			t.Log("uncompressed")
+		}
 
 		for {
 			h, err := payload.Next()

@@ -53,7 +53,7 @@ func newPayloadReader(r io.Reader, files []FileInfo) *payloadReader {
 		isLink:  make([]bool, len(files)),
 	}
 	fileSizes := make([]int64, len(files))
-	var lastInode uint64
+	lastInodes := make(map[uint64]int)
 	for i, info := range files {
 		fileSt := info.(*fileInfo)
 		pr.files[i] = fileSt
@@ -61,14 +61,15 @@ func newPayloadReader(r io.Reader, files []FileInfo) *payloadReader {
 		switch fileSt.fileType() {
 		case cpio.S_ISREG:
 			fileSizes[i] = fileSt.Size()
+
 			// all but the last file in a link group will have no contents. flag
 			// them so we don't try to read the nonexistent payload.
 			ino := fileSt.inode64()
-			if ino == lastInode && ino != 0 {
-				pr.isLink[i-1] = true
-				fileSizes[i-1] = 0
+			if lastInode, ok := lastInodes[ino]; ok && ino != 0 {
+				pr.isLink[lastInode] = true
+				fileSizes[lastInode] = 0
 			}
-			lastInode = ino
+			lastInodes[ino] = i
 		case cpio.S_ISLNK:
 			fileSizes[i] = int64(len(fileSt.linkName))
 		}

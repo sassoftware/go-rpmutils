@@ -17,10 +17,11 @@
 package rpmutils
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 	"testing/iotest"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestReadHeader(t *testing.T) {
@@ -137,23 +138,12 @@ func TestPayloadReader(t *testing.T) {
 
 func TestExpandPayload(t *testing.T) {
 	f, err := os.Open("./testdata/simple-1.0.1-1.i386.rpm")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer f.Close()
 
 	rpm, err := ReadRpm(iotest.HalfReader(f))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
-	tmpdir, err := ioutil.TempDir("", "rpmutil")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpdir)
-
-	if err := rpm.ExpandPayload(tmpdir); err != nil {
-		t.Fatal(err)
-	}
+	tmpdir := t.TempDir()
+	require.NoError(t, rpm.ExpandPayload(tmpdir))
 }

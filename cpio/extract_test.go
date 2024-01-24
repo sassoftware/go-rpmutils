@@ -17,56 +17,38 @@
 package cpio
 
 import (
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
 	"testing/iotest"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestExtract(t *testing.T) {
 	f, err := os.Open("../testdata/foo.cpio")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer f.Close()
 
-	tmpdir, err := ioutil.TempDir("", "cpio")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpdir)
-
+	tmpdir := t.TempDir()
 	hf := iotest.HalfReader(f)
-	if err := Extract(hf, tmpdir); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, Extract(hf, tmpdir), "failed to extract cpio")
 
-	if f, err = os.Open("../testdata/foo.cpio"); err != nil {
-		t.Fatal(err)
-	}
-
-	hf = iotest.HalfReader(f)
-	if err := Extract(hf, tmpdir); err != nil {
-		t.Fatal(err)
-	}
+	// extract again and ensure it overwrites successfully
+	_, err = f.Seek(0, io.SeekStart)
+	require.NoError(t, err)
+	require.NoError(t, Extract(hf, tmpdir), "failed to overwrite extracted cpio")
 }
 
 func TestExtractDotdot(t *testing.T) {
 	f, err := os.Open("../testdata/dotdot.cpio")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer f.Close()
-	tmpdir, err := ioutil.TempDir("", "cpio")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(tmpdir)
-	err = Extract(f, tmpdir)
-	if err != nil {
-		t.Fatal(err)
-	}
+
+	tmpdir := t.TempDir()
+	require.NoError(t, Extract(f, tmpdir))
+
 	if _, err := os.Stat(filepath.Join(tmpdir, "aaaaaaaaa")); err != nil {
 		t.Error("expected file with ../ to extract into top of destdir:", err)
 	}

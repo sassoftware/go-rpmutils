@@ -19,11 +19,8 @@ package rpmutils
 import (
 	"bytes"
 	"crypto"
-	"crypto/md5"
-	"errors"
 	"hash"
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 	"time"
@@ -54,21 +51,16 @@ func (opts *SignatureOptions) creationTime() time.Time {
 	return time.Now()
 }
 
-func makeSignature(stream io.Reader, key *packet.PrivateKey, opts *SignatureOptions) ([]byte, error) {
-	hash := opts.hash()
+func makeSignature(h hash.Hash, key *packet.PrivateKey, opts *SignatureOptions) ([]byte, error) {
+	hashType := opts.hash()
 	sig := &packet.Signature{
 		SigType:      packet.SigTypeBinary,
 		CreationTime: opts.creationTime(),
 		PubKeyAlgo:   key.PublicKey.PubKeyAlgo,
-		Hash:         hash,
+		Hash:         hashType,
 		IssuerKeyId:  &key.KeyId,
 	}
-	h := hash.New()
-	_, err := io.Copy(h, stream)
-	if err != nil {
-		return nil, err
-	}
-	err = sig.Sign(h, key, nil)
+	err := sig.Sign(h, key, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -103,42 +95,58 @@ func getSha1(sigHeader *rpmHeader) string {
 	return vals[0]
 }
 
-func checkMd5(sigHeader *rpmHeader, h hash.Hash) bool {
-	sigmd5, err := sigHeader.GetBytes(SIG_MD5 - _SIGHEADER_TAG_BASE)
+func getSha256(sigHeader *rpmHeader) string {
+	vals, err := sigHeader.GetStrings(SIG_SHA256)
 	if err != nil {
-		return true
+		return ""
 	}
-	return bytes.Equal(sigmd5, h.Sum(nil))
+	return vals[0]
+}
+
+func getHashAndType(sigHeader *rpmHeader) (string, crypto.Hash) {
+	// RPM v4 introduced SHA256 header signatures, prefer them over the
+	// previous SHA1
+	if h := getSha256(sigHeader); h != "" {
+		return h, crypto.SHA256
+	}
+	return getSha1(sigHeader), crypto.SHA1
+}
+
+func digestForSigning(sigHeader, genHeader *rpmHeader, payloadReader io.Reader, opts *SignatureOptions) (genHash, combinedHash hash.Hash, err error) {
+	genHash, combinedHash = opts.hash().New(), opts.hash().New()
+	// write header
+	genHash.Write(genHeader.orig)
+	combinedHash.Write(genHeader.orig)
+	// write and verify payload
+	err = digestPayload(sigHeader, genHeader, payloadReader, []io.Writer{combinedHash})
+	return genHash, combinedHash, err
 }
 
 // SignRpmStream reads an RPM and signs it, returning the set of headers updated with the new signature.
 func SignRpmStream(stream io.Reader, key *packet.PrivateKey, opts *SignatureOptions) (header *RpmHeader, err error) {
 	lead, sigHeader, err := readSignatureHeader(stream)
 	if err != nil {
-		return
+		return nil, err
 	}
-	// parse the general header and also tee it into a buffer
-	genHeaderBuf := new(bytes.Buffer)
-	headerTee := io.TeeReader(stream, genHeaderBuf)
-	genHeader, err := readHeader(headerTee, getSha1(sigHeader), sigHeader.isSource, false)
+	// parse the general header
+	headerDigestValue, headerDigestType := getHashAndType(sigHeader)
+	genHeader, err := readHeader(stream, headerDigestValue, headerDigestType, sigHeader.isSource, false)
+	if err != nil {
+		return nil, err
+	}
+	// hash and sign header
+	genHash, combinedHash, err := digestForSigning(sigHeader, genHeader, stream, opts)
+	if err != nil {
+		return nil, err
+	}
+	// sign header and payload
+	sigPgp, err := makeSignature(combinedHash, key, opts)
 	if err != nil {
 		return
 	}
-	genHeaderBlob := genHeaderBuf.Bytes()
-	// chain the buffered general header to the rest of the payload, and digest the whole lot of it
-	genHeaderAndPayload := io.MultiReader(bytes.NewReader(genHeaderBlob), stream)
-	payloadDigest := md5.New()
-	payloadTee := io.TeeReader(genHeaderAndPayload, payloadDigest)
-	sigPgp, err := makeSignature(payloadTee, key, opts)
+	sigRsa, err := makeSignature(genHash, key, opts)
 	if err != nil {
-		return
-	}
-	if !checkMd5(sigHeader, payloadDigest) {
-		return nil, errors.New("md5 digest mismatch")
-	}
-	sigRsa, err := makeSignature(bytes.NewReader(genHeaderBlob), key, opts)
-	if err != nil {
-		return
+		return nil, err
 	}
 	insertSignatures(sigHeader, sigPgp, sigRsa)
 	return &RpmHeader{
@@ -147,6 +155,34 @@ func SignRpmStream(stream io.Reader, key *packet.PrivateKey, opts *SignatureOpti
 		genHeader: genHeader,
 		isSource:  sigHeader.isSource,
 	}, nil
+}
+
+func getPayloadDigest(header *rpmHeader) (string, crypto.Hash) {
+	digests, err := header.GetStrings(PAYLOADDIGEST)
+	if err != nil || len(digests) == 0 {
+		// no payload digest
+		return "", 0
+	}
+	digest := digests[0]
+	algos, err := header.GetUint32s(PAYLOADDIGESTALGO)
+	if err != nil || len(algos) == 0 {
+		return "", 0
+	}
+	switch algos[0] {
+	case HASH_MD5:
+		return digest, crypto.MD5
+	case HASH_SHA1:
+		return digest, crypto.SHA1
+	case HASH_SHA256:
+		return digest, crypto.SHA256
+	case HASH_SHA384:
+		return digest, crypto.SHA384
+	case HASH_SHA512:
+		return digest, crypto.SHA512
+	case HASH_SHA224:
+		return digest, crypto.SHA224
+	}
+	return "", 0
 }
 
 func canOverwrite(ininfo, outinfo os.FileInfo) bool {
@@ -216,7 +252,7 @@ func rewriteRpm(infile *os.File, outpath string, header *RpmHeader) error {
 		}
 		if outstream == nil {
 			// write-rename
-			tempfile, err := ioutil.TempFile(path.Dir(outpath), path.Base(outpath))
+			tempfile, err := os.CreateTemp(path.Dir(outpath), path.Base(outpath))
 			if err != nil {
 				return err
 			}
@@ -275,7 +311,7 @@ func writeRpm(infile io.ReadSeeker, outstream io.Writer, sigHeader *rpmHeader) e
 	if err = sigHeader.WriteTo(outstream, RPMTAG_HEADERSIGNATURES); err != nil {
 		return err
 	}
-	if _, err := infile.Seek(int64(len(lead)+sigHeader.origSize), 0); err != nil {
+	if _, err := infile.Seek(int64(len(lead)+len(sigHeader.orig)), 0); err != nil {
 		return err
 	}
 	_, err = io.Copy(outstream, infile)

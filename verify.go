@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"crypto"
 	"crypto/md5"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"hash"
@@ -65,30 +66,18 @@ func Verify(stream io.Reader, knownKeys openpgp.EntityList) (header *RpmHeader, 
 	if err != nil {
 		return nil, nil, err
 	}
-	payloadDigest := md5.New()
-	sigs, headerMulti, payloadMulti, err := setupDigesters(sigHeader, payloadDigest)
+	// parse the general header
+	headerDigestValue, headerDigestType := getHashAndType(sigHeader)
+	genHeader, err := readHeader(stream, headerDigestValue, headerDigestType, sigHeader.isSource, false)
 	if err != nil {
 		return nil, nil, err
 	}
-	// parse the general header and also tee it into a buffer
-	genHeaderBuf := new(bytes.Buffer)
-	headerTee := io.TeeReader(stream, genHeaderBuf)
-	genHeader, err := readHeader(headerTee, getSha1(sigHeader), sigHeader.isSource, false)
+	// setup digesters for PGP and payload digest
+	sigs, err = digestAndVerify(sigHeader, genHeader, stream)
 	if err != nil {
 		return nil, nil, err
 	}
-	genHeaderBlob := genHeaderBuf.Bytes()
-	if _, err := headerMulti.Write(genHeaderBlob); err != nil {
-		return nil, nil, err
-	}
-	// chain the buffered general header to the rest of the payload, and digest the whole lot of it
-	genHeaderAndPayload := io.MultiReader(bytes.NewReader(genHeaderBlob), stream)
-	if _, err := io.Copy(payloadMulti, genHeaderAndPayload); err != nil {
-		return nil, nil, err
-	}
-	if !checkMd5(sigHeader, payloadDigest) {
-		return nil, nil, errors.New("md5 digest mismatch")
-	}
+	// verify PGP signatures
 	if knownKeys != nil {
 		for _, sig := range sigs {
 			if err := checkSig(sig, knownKeys); err != nil {
@@ -105,6 +94,8 @@ func Verify(stream io.Reader, knownKeys openpgp.EntityList) (header *RpmHeader, 
 	return hdr, sigs, nil
 }
 
+// Try to parse a PGP signature with the given tag and return its metadata and
+// hash function.
 func setupDigester(sigHeader *rpmHeader, tag int) (*Signature, error) {
 	blob, err := sigHeader.GetBytes(tag)
 	if _, ok := err.(NoSuchTagError); ok {
@@ -127,7 +118,7 @@ func setupDigester(sigHeader *rpmHeader, tag int) (*Signature, error) {
 		}
 	case *packet.Signature:
 		if pkt.IssuerKeyId == nil {
-			return nil, errors.New("Missing keyId in signature")
+			return nil, errors.New("missing keyId in signature")
 		}
 		sig = &Signature{
 			Hash:         pkt.Hash,
@@ -149,35 +140,78 @@ func setupDigester(sigHeader *rpmHeader, tag int) (*Signature, error) {
 	return sig, nil
 }
 
-func setupDigesters(sigHeader *rpmHeader, payloadDigest io.Writer) ([]*Signature, io.Writer, io.Writer, error) {
-	sigs := make([]*Signature, 0)
-	headerWriters := make([]io.Writer, 0)
-	payloadWriters := []io.Writer{payloadDigest}
+// Parse signatures from the header and determine which hash functions are
+// needed to digest the RPM. The caller must write the payload to the returned
+// WriteCloser, then call Close to check if the payload digest matches.
+func digestAndVerify(sigHeader, genHeader *rpmHeader, payloadReader io.Reader) ([]*Signature, error) {
+	var sigs []*Signature
+	// signatures over the general header alone
 	for _, tag := range headerSigTags {
 		sig, err := setupDigester(sigHeader, tag)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, err
 		} else if sig == nil {
 			continue
 		}
 		sig.HeaderOnly = true
-		headerWriters = append(headerWriters, sig.hash)
+		sig.hash.Write(genHeader.orig)
 		sigs = append(sigs, sig)
 	}
+	// signatures over the general header + payload
+	var payloadWriters []io.Writer
 	for _, tag := range payloadSigTags {
 		sig, err := setupDigester(sigHeader, tag)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, err
 		} else if sig == nil {
 			continue
 		}
 		sig.HeaderOnly = false
+		sig.hash.Write(genHeader.orig)
 		payloadWriters = append(payloadWriters, sig.hash)
 		sigs = append(sigs, sig)
 	}
-	headerMulti := io.MultiWriter(headerWriters...)
-	payloadMulti := io.MultiWriter(payloadWriters...)
-	return sigs, headerMulti, payloadMulti, nil
+	return sigs, digestPayload(sigHeader, genHeader, payloadReader, payloadWriters)
+}
+
+func digestPayload(sigHeader, genHeader *rpmHeader, payloadReader io.Reader, payloadWriters []io.Writer) error {
+	// Also compute a digest over the payload for integrity checking purposes
+	if payloadValue, payloadType := getPayloadDigest(genHeader); payloadType != 0 {
+		if !payloadType.Available() {
+			return fmt.Errorf("unknown payload digest %s", payloadType)
+		}
+		payloadHasher := payloadType.New()
+		// hash payload only
+		payloadWriters = append(payloadWriters, payloadHasher)
+		if _, err := io.Copy(io.MultiWriter(payloadWriters...), payloadReader); err != nil {
+			return err
+		}
+		calculated := hex.EncodeToString(payloadHasher.Sum(nil))
+		if calculated != payloadValue {
+			return fmt.Errorf("payload %s digest mismatch", payloadType)
+		}
+		return nil
+	}
+	// Check legacy MD5 digest in sig header as a last resort. This is the only
+	// digest found in the signature header that covers the payload, so for some
+	// old RPMs that don't have a payload digest in the general header this is
+	// the only integrity check we can use unless we're verifying the PGP
+	// signatures.
+	if sigmd5, _ := sigHeader.GetBytes(SIG_MD5 - _SIGHEADER_TAG_BASE); len(sigmd5) != 0 {
+		payloadHasher := md5.New()
+		// hash header + payload
+		payloadHasher.Write(genHeader.orig)
+		payloadWriters = append(payloadWriters, payloadHasher)
+		if _, err := io.Copy(io.MultiWriter(payloadWriters...), payloadReader); err != nil {
+			return err
+		}
+		calculated := payloadHasher.Sum(nil)
+		if !bytes.Equal(calculated, sigmd5) {
+			return errors.New("md5 digest mismatch")
+		}
+		return nil
+	}
+	return errors.New("no usable payload digest found")
 }
 
 func checkSig(sig *Signature, knownKeys openpgp.EntityList) error {

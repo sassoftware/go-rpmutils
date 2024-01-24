@@ -83,7 +83,7 @@ func (hdr *rpmHeader) WriteTo(outfile io.Writer, regionTag int) error {
 	}
 	sort.Ints(keys)
 	entries := bytes.NewBuffer(make([]byte, 0, 16*len(keys)))
-	blobs := bytes.NewBuffer(make([]byte, 0, hdr.origSize))
+	blobs := bytes.NewBuffer(make([]byte, 0, len(hdr.orig)))
 	for _, k := range keys {
 		if k == regionTag {
 			continue
@@ -140,7 +140,7 @@ func (sink *byteCountSink) Write(data []byte) (int, error) {
 // OriginalSignatureHeaderSize returns the size of the lead and signature header
 // area as originally read from the file.
 func (hdr *RpmHeader) OriginalSignatureHeaderSize() int {
-	return hdr.sigHeader.origSize + 96
+	return len(hdr.sigHeader.orig) + 96
 }
 
 // DumpSignatureHeader dumps the lead and signature header, optionally adding or
@@ -161,7 +161,7 @@ func (hdr *RpmHeader) DumpSignatureHeader(sameSize bool) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		available := uint64(sigh.origSize)
+		available := uint64(len(sigh.orig))
 		if needed+16 <= available {
 			// Fill unused space with a RESERVEDSPACE tag
 			padding := make([]byte, available-needed-16)

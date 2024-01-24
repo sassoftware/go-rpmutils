@@ -21,6 +21,7 @@ import (
 	"io"
 	"os"
 	"testing"
+	"testing/iotest"
 
 	"golang.org/x/crypto/openpgp"
 )
@@ -104,3 +105,83 @@ bCw9mwgJ2r0mQLqjrXjEYBhaE49I8A==
 =+d52
 -----END PGP PRIVATE KEY BLOCK-----
 `
+
+func TestSHA256HeaderAndPayload(t *testing.T) {
+	keyring, err := openpgp.ReadArmoredKeyRing(bytes.NewReader([]byte(testkey)))
+	if err != nil {
+		t.Fatal("failed to parse test key:", err)
+	}
+	entity := keyring[0]
+
+	f, err := os.Open("./testdata/nfpm/test-1.0.0.x86_64.rpm")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+
+	h, err := SignRpmStream(f, entity.PrivateKey, nil)
+	if err != nil {
+		t.Fatal("error signing rpm:", err)
+	}
+	sigblob, err := h.DumpSignatureHeader(false)
+	if err != nil {
+		t.Fatal("error writing sig header:", err)
+	}
+	if len(sigblob)%8 != 0 {
+		t.Fatalf("incorrect padding: got %d bytes, expected a multiple of 8", len(sigblob))
+	}
+	// verify by merging the new sig header with the original file
+	if _, err = f.Seek(int64(h.OriginalSignatureHeaderSize()), io.SeekStart); err != nil {
+		t.Fatal("error seeking:", err)
+	}
+	signed := io.MultiReader(bytes.NewReader(sigblob), f)
+	_, sigs, err := Verify(signed, keyring)
+	if err != nil {
+		t.Fatal("error verifying signature:", err)
+	}
+	if len(sigs) != 2 || sigs[0].Signer != entity || sigs[1].Signer != entity {
+		t.Fatalf("error verifying signature: incorrect signers. found: %#v", sigs)
+	}
+	// check padding for odd sized signature tags
+	h.sigHeader.entries[1234] = entry{dataType: RPM_BIN_TYPE, count: 3, contents: []byte("foo")}
+	sigblob, err = h.DumpSignatureHeader(false)
+	if err != nil {
+		t.Fatal("error writing sig header:", err)
+	}
+	if len(sigblob)%8 != 0 {
+		t.Fatalf("incorrect padding: got %d bytes, expected a multiple of 8", len(sigblob))
+	}
+
+}
+
+func TestReadSha256PayloadHeader(t *testing.T) {
+	f, err := os.Open("./testdata/nfpm/test-1.0.0.x86_64.rpm")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+
+	rpm, err := ReadRpm(iotest.HalfReader(f))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	hashType, err := rpm.Header.GetInt(PAYLOADDIGESTALGO)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if hashType != HASH_SHA256 {
+		t.Fatalf("expected hash type of %d, got %d", HASH_SHA256, hashType)
+	}
+
+	digest, err := rpm.Header.GetString(PAYLOADDIGEST)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := "0ba72025da7d469c62e03d2dcec072c4ea6b8fecbede01d01f4f620a162f8309"
+	if digest != expected {
+		t.Fatalf("expected digest of '%s', got %s", expected, digest)
+	}
+
+}

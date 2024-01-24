@@ -18,8 +18,9 @@ package rpmutils
 
 import (
 	"bytes"
-	"crypto/sha1"
+	"crypto"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -38,7 +39,7 @@ type entry struct {
 type rpmHeader struct {
 	entries  map[int]entry
 	isSource bool
-	origSize int
+	orig     []byte
 }
 
 type headerIntro struct {
@@ -71,7 +72,11 @@ func readExact(f io.Reader, n int) ([]byte, error) {
 	return buf, err
 }
 
-func readHeader(f io.Reader, hash string, isSource bool, sigBlock bool) (*rpmHeader, error) {
+func readHeader(f io.Reader, hash string, hashType crypto.Hash, isSource bool, sigBlock bool) (*rpmHeader, error) {
+	// save original header
+	var origBuf bytes.Buffer
+	f = io.TeeReader(f, &origBuf)
+	// verify intro
 	var intro headerIntro
 	if err := binary.Read(f, binary.BigEndian, &intro); err != nil {
 		return nil, fmt.Errorf("error reading RPM header: %s", err.Error())
@@ -79,11 +84,12 @@ func readHeader(f io.Reader, hash string, isSource bool, sigBlock bool) (*rpmHea
 	if intro.Magic != introMagic {
 		return nil, fmt.Errorf("bad magic for header")
 	}
+	// read entries
 	entryTable, err := readExact(f, int(intro.Entries*16))
 	if err != nil {
 		return nil, fmt.Errorf("error reading RPM header table: %s", err.Error())
 	}
-
+	// read data
 	size := intro.Size
 	if sigBlock {
 		// signature block is padded to 8 byte alignment
@@ -93,24 +99,16 @@ func readHeader(f io.Reader, hash string, isSource bool, sigBlock bool) (*rpmHea
 	if err != nil {
 		return nil, fmt.Errorf("error reading RPM header data: %s", err.Error())
 	}
-
-	// Check sha1 if it was specified
+	// Check hash if it was specified
 	if len(hash) > 1 {
-		h := sha1.New()
-		if err = binary.Write(h, binary.BigEndian, &intro); err != nil {
-			return nil, err
-		}
-		if _, err = h.Write(entryTable); err != nil {
-			return nil, err
-		}
-		if _, err = h.Write(data); err != nil {
-			return nil, err
-		}
-		if fmt.Sprintf("%x", h.Sum(nil)) != hash {
-			return nil, fmt.Errorf("bad header sha1")
+		h := hashType.New()
+		h.Write(origBuf.Bytes())
+		calculated := hex.EncodeToString(h.Sum(nil))
+		if calculated != hash {
+			return nil, fmt.Errorf("%s mismatch in signature header", hashType)
 		}
 	}
-
+	// parse entries
 	ents := make(map[int]entry)
 	buf := bytes.NewReader(entryTable)
 	for i := 0; i < int(intro.Entries); i++ {
@@ -143,7 +141,7 @@ func readHeader(f io.Reader, hash string, isSource bool, sigBlock bool) (*rpmHea
 	return &rpmHeader{
 		entries:  ents,
 		isSource: isSource,
-		origSize: 16 + len(entryTable) + len(data),
+		orig:     origBuf.Bytes(),
 	}, nil
 }
 

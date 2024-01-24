@@ -122,6 +122,9 @@ const (
 	BUGURL         = 5012
 	VCS            = 5034
 	ENCODING       = 5062
+
+	PAYLOADDIGEST     = 5092
+	PAYLOADDIGESTALGO = 5093
 )
 
 // RPM header tags found in the signature header
@@ -130,8 +133,9 @@ const (
 	SIG_DSA             = SIG_BASE + 11 // DSA signature over header only
 	SIG_RSA             = SIG_BASE + 12 // RSA signature over header only
 	SIG_SHA1            = SIG_BASE + 13 // SHA1 over header only (hex)
-	SIG_LONGSIZE        = SIG_BASE + 15 // header + compressed payload (uint64)
+	SIG_LONGSIGSIZE     = SIG_BASE + 14 // header + compressed payload (uint64)
 	SIG_LONGARCHIVESIZE = SIG_BASE + 15 // uncompressed payload bytes (uint64)
+	SIG_SHA256          = SIG_BASE + 17 // SHA256 over header only (hex)
 
 	// Given that there is overlap between signature tag headers and general tag
 	// headers, we offset the signature ones by some amount
@@ -195,4 +199,18 @@ const (
 	RPMTAG_HEADERSIGNATURES = 62
 	RPMTAG_HEADERIMMUTABLE  = 63
 	RPMTAG_HEADERREGIONS    = 64
+)
+
+// Crypto algos
+const (
+	HASH_MD5         = 1
+	HASH_SHA1        = 2
+	HASH_RIPEMD160   = 3
+	HASH_MD2         = 5
+	HASH_TIGER192    = 6
+	HASH_HAVAL_5_160 = 7
+	HASH_SHA256      = 8
+	HASH_SHA384      = 9
+	HASH_SHA512      = 10
+	HASH_SHA224      = 11
 )

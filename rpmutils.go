@@ -100,7 +100,8 @@ func ReadHeader(f io.Reader) (*RpmHeader, error) {
 		return nil, err
 	}
 
-	genHeader, err := readHeader(f, getSha1(sigHeader), sigHeader.isSource, false)
+	hash, hashType := getHashAndType(sigHeader)
+	genHeader, err := readHeader(f, hash, hashType, sigHeader.isSource, false)
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +131,7 @@ func readSignatureHeader(f io.Reader) ([]byte, *rpmHeader, error) {
 	isSource := binary.BigEndian.Uint16(lead[6:8]) == 1
 
 	// Return signature header
-	hdr, err := readHeader(f, "", isSource, true)
+	hdr, err := readHeader(f, "", 0, isSource, true)
 	return lead, hdr, err
 }
 
@@ -144,8 +145,8 @@ type HeaderRange struct {
 
 // GetRange returns the byte offsets that the RPM header spans within the original RPM file
 func (hdr *RpmHeader) GetRange() HeaderRange {
-	start := 96 + hdr.sigHeader.origSize
-	end := start + hdr.genHeader.origSize
+	start := 96 + len(hdr.sigHeader.orig)
+	end := start + len(hdr.genHeader.orig)
 	return HeaderRange{
 		Start: start,
 		End:   end,

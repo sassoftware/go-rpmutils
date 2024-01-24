@@ -22,7 +22,7 @@ import (
 	"os"
 	"testing"
 
-	"golang.org/x/crypto/openpgp"
+	"github.com/ProtonMail/go-crypto/openpgp"
 )
 
 func TestSign(t *testing.T) {

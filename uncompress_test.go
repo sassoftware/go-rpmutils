@@ -2,7 +2,6 @@ package rpmutils
 
 import (
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -35,7 +34,7 @@ func TestUncompress(t *testing.T) {
 					break
 				}
 				require.NoError(t, err)
-				_, err = io.Copy(ioutil.Discard, payload)
+				_, err = io.Copy(io.Discard, payload)
 				require.NoError(t, err)
 				files++
 			}

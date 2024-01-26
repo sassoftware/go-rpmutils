@@ -17,7 +17,6 @@
 package rpmutils
 
 import (
-	"bytes"
 	"crypto"
 	"hash"
 	"io"
@@ -26,7 +25,6 @@ import (
 	"time"
 
 	"github.com/sassoftware/go-rpmutils/fileutil"
-	"golang.org/x/crypto/openpgp/packet"
 )
 
 // SignatureOptions describes additional configuration for SignRpm methods
@@ -49,27 +47,6 @@ func (opts *SignatureOptions) creationTime() time.Time {
 		return opts.CreationTime
 	}
 	return time.Now()
-}
-
-func makeSignature(h hash.Hash, key *packet.PrivateKey, opts *SignatureOptions) ([]byte, error) {
-	hashType := opts.hash()
-	sig := &packet.Signature{
-		SigType:      packet.SigTypeBinary,
-		CreationTime: opts.creationTime(),
-		PubKeyAlgo:   key.PublicKey.PubKeyAlgo,
-		Hash:         hashType,
-		IssuerKeyId:  &key.KeyId,
-	}
-	err := sig.Sign(h, key, nil)
-	if err != nil {
-		return nil, err
-	}
-	var buf bytes.Buffer
-	err = sig.Serialize(&buf)
-	if err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
 }
 
 func insertSignature(sigHeader *rpmHeader, tag int, value []byte) {
@@ -122,8 +99,8 @@ func digestForSigning(sigHeader, genHeader *rpmHeader, payloadReader io.Reader, 
 	return genHash, combinedHash, err
 }
 
-// SignRpmStream reads an RPM and signs it, returning the set of headers updated with the new signature.
-func SignRpmStream(stream io.Reader, key *packet.PrivateKey, opts *SignatureOptions) (header *RpmHeader, err error) {
+// SignStream reads an RPM and signs it, returning the set of headers updated with the new signature.
+func SignStream(stream io.Reader, signer Signer, opts *SignatureOptions) (*RpmHeader, error) {
 	lead, sigHeader, err := readSignatureHeader(stream)
 	if err != nil {
 		return nil, err
@@ -140,11 +117,11 @@ func SignRpmStream(stream io.Reader, key *packet.PrivateKey, opts *SignatureOpti
 		return nil, err
 	}
 	// sign header and payload
-	sigPgp, err := makeSignature(combinedHash, key, opts)
+	sigPgp, err := signer.Sign(combinedHash, opts.hash(), opts.creationTime())
 	if err != nil {
-		return
+		return nil, err
 	}
-	sigRsa, err := makeSignature(genHash, key, opts)
+	sigRsa, err := signer.Sign(genHash, opts.hash(), opts.creationTime())
 	if err != nil {
 		return nil, err
 	}
@@ -198,9 +175,9 @@ func canOverwrite(ininfo, outinfo os.FileInfo) bool {
 	return true
 }
 
-// SignRpmFile signs infile and writes it to outpath, which may be the same file
-func SignRpmFile(infile *os.File, outpath string, key *packet.PrivateKey, opts *SignatureOptions) (header *RpmHeader, err error) {
-	header, err = SignRpmStream(infile, key, opts)
+// SignFile signs infile and writes it to outpath, which may be the same file
+func SignFile(infile *os.File, outpath string, signer Signer, opts *SignatureOptions) (header *RpmHeader, err error) {
+	header, err = SignStream(infile, signer, opts)
 	if err != nil {
 		return
 	}
@@ -209,7 +186,7 @@ func SignRpmFile(infile *os.File, outpath string, key *packet.PrivateKey, opts *
 
 // RewriteWithSignatures inserts raw signatures into a RPM header.
 //
-// DEPRECATED: To perform a detached signature, use SignRpmStream and call
+// Deprecated: To perform a detached signature, use SignRpmStream and call
 // DumpSignatureHeader to export the result.
 func RewriteWithSignatures(infile *os.File, outpath string, sigPgp, sigRsa []byte) (*RpmHeader, error) {
 	header, err := ReadHeader(infile)

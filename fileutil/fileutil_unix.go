@@ -21,12 +21,12 @@ package fileutil
 
 import (
 	"os"
-	"syscall"
+	"golang.org/x/sys/unix"
 )
 
 // HasLinks returns true if the given file has Nlink > 1
 func HasLinks(info os.FileInfo) bool {
-	stat, ok := info.Sys().(*syscall.Stat_t)
+	stat, ok := info.Sys().(*unix.Stat_t)
 	if !ok {
 		return false
 	}
@@ -35,5 +35,5 @@ func HasLinks(info os.FileInfo) bool {
 
 // Mkfifo creates a named pipe with the specified path and permissions
 func Mkfifo(path string, mode uint32) error {
-	return syscall.Mkfifo(path, mode)
+	return unix.Mkfifo(path, mode)
 }

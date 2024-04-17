@@ -23,7 +23,7 @@ import (
 	"testing"
 	"testing/iotest"
 
-	"golang.org/x/crypto/openpgp"
+	"golang.org/x/crypto/openpgp" //nolint:staticcheck
 )
 
 func TestSign(t *testing.T) {

@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/sassoftware/go-rpmutils/fileutil"
-	"golang.org/x/crypto/openpgp/packet"
+	"golang.org/x/crypto/openpgp/packet" //nolint:staticcheck
 )
 
 // SignatureOptions describes additional configuration for SignRpm methods

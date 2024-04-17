@@ -27,8 +27,8 @@ import (
 	"io"
 	"time"
 
-	"golang.org/x/crypto/openpgp"
-	"golang.org/x/crypto/openpgp/packet"
+	"golang.org/x/crypto/openpgp" //nolint:staticcheck
+	"golang.org/x/crypto/openpgp/packet" //nolint:staticcheck
 )
 
 var headerSigTags = []int{SIG_RSA, SIG_DSA}

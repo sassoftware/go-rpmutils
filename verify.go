@@ -17,25 +17,15 @@
 package rpmutils
 
 import (
-	"bytes"
 	"crypto"
-	"crypto/md5"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"hash"
 	"io"
 	"time"
 
-	"golang.org/x/crypto/openpgp" //nolint:staticcheck
-	"golang.org/x/crypto/openpgp/packet" //nolint:staticcheck
+	"github.com/ProtonMail/go-crypto/openpgp"
 )
-
-var headerSigTags = []int{SIG_RSA, SIG_DSA}
-var payloadSigTags = []int{
-	SIG_PGP - _SIGHEADER_TAG_BASE,
-	SIG_GPG - _SIGHEADER_TAG_BASE,
-}
 
 // Signature describes a PGP signature found within a RPM while verifying it.
 type Signature struct {
@@ -52,9 +42,13 @@ type Signature struct {
 	HeaderOnly bool
 	// KeyId is the PGP key that created the signature.
 	KeyId uint64
+	// KeyFingerprint is the fingerprint of the public key that created the
+	// signature, if available.
+	KeyFingerprint []byte
+	// PrimaryName is the primary identity of the signing key, if available.
+	PrimaryName string
 
-	packet packet.Packet
-	hash   hash.Hash
+	validate func(hash.Hash) error
 }
 
 // Verify the PGP signature over a RPM file. knownKeys should enumerate public
@@ -73,16 +67,15 @@ func Verify(stream io.Reader, knownKeys openpgp.EntityList) (header *RpmHeader, 
 		return nil, nil, err
 	}
 	// setup digesters for PGP and payload digest
-	sigs, err = digestAndVerify(sigHeader, genHeader, stream)
+	sigs, hashes, err := digestAndVerify(sigHeader, genHeader, stream, knownKeys)
 	if err != nil {
 		return nil, nil, err
 	}
 	// verify PGP signatures
-	if knownKeys != nil {
-		for _, sig := range sigs {
-			if err := checkSig(sig, knownKeys); err != nil {
-				return nil, nil, err
-			}
+	for i, sig := range sigs {
+		h := hashes[i]
+		if err := sig.validate(h); err != nil {
+			return nil, nil, err
 		}
 	}
 	hdr := &RpmHeader{
@@ -94,144 +87,19 @@ func Verify(stream io.Reader, knownKeys openpgp.EntityList) (header *RpmHeader, 
 	return hdr, sigs, nil
 }
 
-// Try to parse a PGP signature with the given tag and return its metadata and
-// hash function.
-func setupDigester(sigHeader *rpmHeader, tag int) (*Signature, error) {
-	blob, err := sigHeader.GetBytes(tag)
-	if _, ok := err.(NoSuchTagError); ok {
-		return nil, nil
-	} else if err != nil {
-		return nil, err
-	}
-	packetReader := packet.NewReader(bytes.NewReader(blob))
-	genpkt, err := packetReader.Next()
-	if err != nil {
-		return nil, err
-	}
-	var sig *Signature
-	switch pkt := genpkt.(type) {
-	case *packet.SignatureV3:
-		sig = &Signature{
-			Hash:         pkt.Hash,
-			CreationTime: pkt.CreationTime,
-			KeyId:        pkt.IssuerKeyId,
-		}
-	case *packet.Signature:
-		if pkt.IssuerKeyId == nil {
-			return nil, errors.New("missing keyId in signature")
-		}
-		sig = &Signature{
-			Hash:         pkt.Hash,
-			CreationTime: pkt.CreationTime,
-			KeyId:        *pkt.IssuerKeyId,
-		}
-	default:
-		return nil, fmt.Errorf("tag %d does not contain a PGP signature", tag)
-	}
-	_, err = packetReader.Next()
-	if err != io.EOF {
-		return nil, fmt.Errorf("trailing garbage after signature in tag %d", tag)
-	}
-	sig.packet = genpkt
-	if !sig.Hash.Available() {
-		return nil, errors.New("signature uses unknown digest")
-	}
-	sig.hash = sig.Hash.New()
-	return sig, nil
+var (
+	ErrNoPGPSignature  = errors.New("no supported PGP signature packet found")
+	ErrTrailingGarbage = errors.New("trailing garbage after PGP signature packet")
+)
+
+type KeyNotFoundError struct {
+	KeyID       uint64
+	Fingerprint []byte
 }
 
-// Parse signatures from the header and determine which hash functions are
-// needed to digest the RPM. The caller must write the payload to the returned
-// WriteCloser, then call Close to check if the payload digest matches.
-func digestAndVerify(sigHeader, genHeader *rpmHeader, payloadReader io.Reader) ([]*Signature, error) {
-	var sigs []*Signature
-	// signatures over the general header alone
-	for _, tag := range headerSigTags {
-		sig, err := setupDigester(sigHeader, tag)
-		if err != nil {
-			return nil, err
-		} else if sig == nil {
-			continue
-		}
-		sig.HeaderOnly = true
-		sig.hash.Write(genHeader.orig)
-		sigs = append(sigs, sig)
+func (e KeyNotFoundError) Error() string {
+	if e.KeyID == 0 && len(e.Fingerprint) > 0 {
+		return fmt.Sprintf("key with fingerprint %x not found", e.Fingerprint)
 	}
-	// signatures over the general header + payload
-	var payloadWriters []io.Writer
-	for _, tag := range payloadSigTags {
-		sig, err := setupDigester(sigHeader, tag)
-		if err != nil {
-			return nil, err
-		} else if sig == nil {
-			continue
-		}
-		sig.HeaderOnly = false
-		sig.hash.Write(genHeader.orig)
-		payloadWriters = append(payloadWriters, sig.hash)
-		sigs = append(sigs, sig)
-	}
-	return sigs, digestPayload(sigHeader, genHeader, payloadReader, payloadWriters)
-}
-
-func digestPayload(sigHeader, genHeader *rpmHeader, payloadReader io.Reader, payloadWriters []io.Writer) error {
-	// Also compute a digest over the payload for integrity checking purposes
-	if payloadValue, payloadType := getPayloadDigest(genHeader); payloadType != 0 {
-		if !payloadType.Available() {
-			return fmt.Errorf("unknown payload digest %s", payloadType)
-		}
-		payloadHasher := payloadType.New()
-		// hash payload only
-		payloadWriters = append(payloadWriters, payloadHasher)
-		if _, err := io.Copy(io.MultiWriter(payloadWriters...), payloadReader); err != nil {
-			return err
-		}
-		calculated := hex.EncodeToString(payloadHasher.Sum(nil))
-		if calculated != payloadValue {
-			return fmt.Errorf("payload %s digest mismatch", payloadType)
-		}
-		return nil
-	}
-	// Check legacy MD5 digest in sig header as a last resort. This is the only
-	// digest found in the signature header that covers the payload, so for some
-	// old RPMs that don't have a payload digest in the general header this is
-	// the only integrity check we can use unless we're verifying the PGP
-	// signatures.
-	if sigmd5, _ := sigHeader.GetBytes(SIG_MD5 - _SIGHEADER_TAG_BASE); len(sigmd5) != 0 {
-		payloadHasher := md5.New()
-		// hash header + payload
-		payloadHasher.Write(genHeader.orig)
-		payloadWriters = append(payloadWriters, payloadHasher)
-		if _, err := io.Copy(io.MultiWriter(payloadWriters...), payloadReader); err != nil {
-			return err
-		}
-		calculated := payloadHasher.Sum(nil)
-		if !bytes.Equal(calculated, sigmd5) {
-			return errors.New("md5 digest mismatch")
-		}
-		return nil
-	}
-	return errors.New("no usable payload digest found")
-}
-
-func checkSig(sig *Signature, knownKeys openpgp.EntityList) error {
-	keys := knownKeys.KeysById(sig.KeyId)
-	if keys == nil {
-		return fmt.Errorf("keyid %x not found", sig.KeyId)
-	}
-	key := keys[0]
-	sig.Signer = key.Entity
-	var err error
-	switch pkt := sig.packet.(type) {
-	case *packet.Signature:
-		err = key.PublicKey.VerifySignature(sig.hash, pkt)
-	case *packet.SignatureV3:
-		err = key.PublicKey.VerifySignatureV3(sig.hash, pkt)
-	}
-	if err != nil {
-		return err
-	}
-	sig.packet = nil
-	sig.hash = nil
-	return nil
+	return fmt.Sprintf("keyid %08x not found", e.KeyID)
 }

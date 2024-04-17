@@ -40,6 +40,58 @@ if err := rpm.ExpandPayload("destdir"); err != nil {
 }
 ```
 
+## Validating Signatures
+
+rpmutils supports validating PGP signatures embedded in RPM files.
+
+```go
+import (
+    "github.com/sassoftware/go-rpmutils"
+    "github.com/ProtonMail/go-crypto/openpgp"
+)
+
+func main() {
+    kf, err := os.Open("trusted.pgp")
+    keyring, err := openpgp.ReadArmoredKeyRing(kf)
+    f, err := os.Open("foo.rpm")
+    hdr, sigs, err := rpmutils.Verify(f, keyring)
+}
+```
+
+Passing `nil` as the keyring will parse the signature without validating it, so
+that the signers' key ID can be inspected.
+
+By default rpmutils uses the
+[ProtonMail](https://github.com/ProtonMail/go-crypto) PGP implementation, which
+supports PGP v4 and later signatures. PGP v4 was released in 1998, and yet some
+still-supported Linux distributions contain RPMs with v3 signatures.
+
+Depending on your needs you may want to use the
+[pgpkeys-eu](https://github.com/pgpkeys-eu/go-crypto) soft fork, which re-adds
+v3 signature support. To consume it, the binary being built must have a
+`replace` directive, and must set the `pgp3` tag to enable the related
+validation code in rpmutils:
+
+```
+go mod edit -replace github.com/ProtonMail/go-crypto=github.com/pgpkeys-eu/go-crypto@main
+go build -t pgp3
+```
+
+### Upgrading from versions before v0.4.0
+
+Previous versions of rpmutils used the standard library
+`golang.org/x/crypto/openpgp` implementation, which has been deprecated for some
+time. Most callers that are verifying or signing RPMs will just need to change
+imports to `github.com/ProtonMail/go-crypto/openpgp` .
+
+There are two known regressions with the ProtonMail implementation. The first is
+that PGP v3 signatures are no longer supported. If this is important to you,
+then see the above note about using the pgpkeys-eu fork instead.
+
+The second is that signing with a HSM-bound private key (`crypto.Signer`) of
+type other than RSA is currently not supported by ProtonMail. Hopefully a future
+release will restore this functionality.
+
 ## Contributing
 
 1. Read contributor agreement

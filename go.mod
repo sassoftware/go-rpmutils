@@ -1,6 +1,6 @@
 module github.com/sassoftware/go-rpmutils
 
-go 1.20
+go 1.21
 
 require (
 	github.com/DataDog/zstd v1.5.5
@@ -10,14 +10,14 @@ require (
 	github.com/ulikunitz/xz v0.5.12
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
 	go.uber.org/goleak v1.3.0
-	golang.org/x/sys v0.19.0
+	golang.org/x/sys v0.20.0
 )
 
 require (
-	github.com/cloudflare/circl v1.3.3 // indirect
+	github.com/cloudflare/circl v1.3.8 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	golang.org/x/crypto v0.22.0 // indirect
+	golang.org/x/crypto v0.23.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

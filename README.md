@@ -74,7 +74,7 @@ validation code in rpmutils:
 
 ```
 go mod edit -replace github.com/ProtonMail/go-crypto=github.com/pgpkeys-eu/go-crypto@main
-go build -t pgp3
+go build -tags pgp3
 ```
 
 ### Upgrading from versions before v0.4.0

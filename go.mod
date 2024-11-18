@@ -8,7 +8,6 @@ require (
 	github.com/klauspost/compress v1.17.8
 	github.com/stretchr/testify v1.9.0
 	github.com/ulikunitz/xz v0.5.12
-	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
 	go.uber.org/goleak v1.3.0
 	golang.org/x/sys v0.20.0
 )

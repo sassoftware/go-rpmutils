@@ -23,8 +23,8 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/ulikunitz/xz"
 	"github.com/ulikunitz/xz/lzma"
-	"github.com/xi2/xz"
 )
 
 // Wrap RPM payload with uncompress reader, assumes that header has
@@ -77,7 +77,7 @@ func uncompressRpmPayloadReader(r io.Reader, hdr *RpmHeader) (io.Reader, error) 
 	case "lzma":
 		return lzma.NewReader(r)
 	case "xz":
-		return xz.NewReader(r, 0)
+		return xz.NewReader(r)
 	case "uncompressed":
 		// prevent ExpandPayload from closing the underlying file
 		return noCloseWrapper{r}, nil

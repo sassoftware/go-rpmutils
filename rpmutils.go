@@ -210,14 +210,39 @@ func (hdr *RpmHeader) GetInts(tag int) ([]int, error) {
 	return h.GetInts(t)
 }
 
-// GetUint32s gets an int array as a uint32 slice. This can accomodate any int
+// GetUint32 gets an uint32 type other than INT64. Note that it returns 0 when fails instead of -1.
+// Returns an error in case of overflow.
+func (hdr *RpmHeader) GetUint32(tag int) (uint32, error) {
+	vals, err := hdr.GetUint32s(tag)
+	if err != nil {
+		return 0, err
+	}
+	if len(vals) != 1 {
+		return 0, fmt.Errorf("incorrect number of values")
+	}
+	return vals[0], nil
+}
+
+// GetUint32s gets an int array as a uint32 slice. This can accommodate any int
 // type other than INT64. Returns an error in case of overflow.
 func (hdr *RpmHeader) GetUint32s(tag int) ([]uint32, error) {
 	h, t := hdr.getHeader(tag)
 	return h.GetUint32s(t)
 }
 
-// GetUint64s gets an int array as a uint64 slice. This can accomodate all int
+// GetUint64 gets an uint64 type. Note that it returns 0 when fails instead of -1.
+func (hdr *RpmHeader) GetUint64(tag int) (uint64, error) {
+	vals, err := hdr.GetUint64s(tag)
+	if err != nil {
+		return 0, err
+	}
+	if len(vals) != 1 {
+		return 0, fmt.Errorf("incorrect number of values")
+	}
+	return vals[0], nil
+}
+
+// GetUint64s gets an int array as a uint64 slice. This can accommodate all int
 // types
 func (hdr *RpmHeader) GetUint64s(tag int) ([]uint64, error) {
 	h, t := hdr.getHeader(tag)
@@ -291,4 +316,9 @@ func (hdr *RpmHeader) PayloadSize() (int64, error) {
 		return -1, errors.New("incorrect number of values")
 	}
 	return int64(u[0]), err
+}
+
+// IsSource return isSource
+func (hdr *RpmHeader) IsSource() bool {
+	return hdr.isSource
 }

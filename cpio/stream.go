@@ -57,7 +57,7 @@ func (fs *file_stream) Read(p []byte) (n int, err error) {
 	if int64(len(p)) > fs.size-fs.curr_pos {
 		p = p[0 : fs.size-fs.curr_pos]
 	}
-	n, err = fs.stream.Read(p)
+	n, err = io.ReadFull(fs.stream, p)
 	fs.curr_pos += int64(n)
 	return
 }

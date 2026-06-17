@@ -94,13 +94,15 @@ release will restore this functionality.
 
 ## Contributing
 
-1. Read contributor agreement
+1. Read the [contributor agreement](ContributorAgreement.txt)
 2. Fork it
 3. Create your feature branch (`git checkout -b my-new-feature`)
-4. Commit your changes (`git commit -a`). Make sure to include a Signed-off-by line per the contributor agreement.
+4. Commit your changes (`git commit -a -s`)
 5. Push to the branch (`git push origin my-new-feature`)
 6. Create new Pull Request
 
+For complete details, see [CONTRIBUTING.md](CONTRIBUTING.md)
+
 ## License
 
-go-rpmutils is released under the Apache 2.0 license. See [LICENSE](https://github.com/sassoftware/go-rpmutils/blob/master/LICENSE).
+go-rpmutils is released under the Apache 2.0 license. See [LICENSE](LICENSE).

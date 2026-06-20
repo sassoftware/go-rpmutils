@@ -91,6 +91,16 @@ func (rpm *Rpm) PayloadReaderExtended() (PayloadReader, error) {
 	return newPayloadReader(pld, files), nil
 }
 
+// CpioStream returns a cpio stream for the RPM payload
+func (rpm *Rpm) CpioStream() (*cpio.CpioStream, error) {
+	pld, err := uncompressRpmPayloadReader(rpm.f, rpm.Header)
+	if err != nil {
+		return nil, err
+	}
+
+	return cpio.NewCpioStream(pld), nil
+}
+
 // ReadHeader reads the signature and general headers from a RPM.
 //
 // The stream is positioned for reading the compressed payload following the headers.

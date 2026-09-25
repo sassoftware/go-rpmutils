@@ -17,7 +17,10 @@
 package rpmutils
 
 import (
+	"bytes"
+	"encoding/binary"
 	"os"
+	"runtime"
 	"testing"
 	"testing/iotest"
 
@@ -146,4 +149,28 @@ func TestExpandPayload(t *testing.T) {
 
 	tmpdir := t.TempDir()
 	require.NoError(t, rpm.ExpandPayload(tmpdir))
+}
+
+func TestReadHeaderRejectsMalformed(t *testing.T) {
+	rpm, err := os.ReadFile("./testdata/simple-1.0.1-1.i386.rpm")
+	require.NoError(t, err)
+	for name, corrupt := range map[string]func(b []byte){
+		"too many entries":      func(b []byte) { binary.BigEndian.PutUint32(b[104:], 0x10000) },
+		"data too large":        func(b []byte) { binary.BigEndian.PutUint32(b[108:], 0x10000000) },
+		"truncated data":        func(b []byte) { binary.BigEndian.PutUint32(b[108:], 0x0fffffff) },
+		"string without values": func(b []byte) { binary.BigEndian.PutUint32(b[140:], 0) },
+		"offset out of range":   func(b []byte) { binary.BigEndian.PutUint32(b[152:], 0x7fffffff) },
+		"overlapping data":      func(b []byte) { binary.BigEndian.PutUint32(b[168:], 44) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			b := bytes.Clone(rpm)
+			corrupt(b)
+			var before, after runtime.MemStats
+			runtime.ReadMemStats(&before)
+			_, err := ReadHeader(bytes.NewReader(b))
+			runtime.ReadMemStats(&after)
+			require.Error(t, err)
+			require.Less(t, after.TotalAlloc-before.TotalAlloc, uint64(1024*1024))
+		})
+	}
 }

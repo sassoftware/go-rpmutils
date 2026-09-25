@@ -146,12 +146,7 @@ func (cr *countingReader) Seek(offset int64, whence int) (int64, error) {
 	if offset == 0 {
 		return cr.curPos, nil
 	}
-	b := make([]byte, offset)
-	n, err := io.ReadFull(cr, b)
-	if err != nil && err != io.EOF {
-		return 0, err
-	}
-	return int64(n), nil
+	return io.CopyN(io.Discard, cr, offset)
 }
 
 func pad(num int) int {

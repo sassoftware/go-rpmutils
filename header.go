@@ -66,10 +66,14 @@ var typeSizes = map[int32]int{
 	RPM_BIN_TYPE:   1,
 }
 
+// readExact grows the buffer with the input instead of trusting a declared size
 func readExact(f io.Reader, n int) ([]byte, error) {
-	buf := make([]byte, n)
-	_, err := io.ReadFull(f, buf)
-	return buf, err
+	var buf bytes.Buffer
+	_, err := io.CopyN(&buf, f, int64(n))
+	if err == io.EOF && buf.Len() > 0 {
+		err = io.ErrUnexpectedEOF
+	}
+	return buf.Bytes(), err
 }
 
 func readHeader(f io.Reader, hash string, hashType crypto.Hash, isSource bool, sigBlock bool) (*rpmHeader, error) {
@@ -83,6 +87,10 @@ func readHeader(f io.Reader, hash string, hashType crypto.Hash, isSource bool, s
 	}
 	if intro.Magic != introMagic {
 		return nil, fmt.Errorf("bad magic for header")
+	}
+	// same limits as rpmlib's hdrchkTags and hdrchkData
+	if intro.Entries > 0xffff || intro.Size > 0x0fffffff {
+		return nil, fmt.Errorf("RPM header size out of range")
 	}
 	// read entries
 	entryTable, err := readExact(f, int(intro.Entries*16))
@@ -111,15 +119,27 @@ func readHeader(f io.Reader, hash string, hashType crypto.Hash, isSource bool, s
 	// parse entries
 	ents := make(map[int]entry)
 	buf := bytes.NewReader(entryTable)
+	prevEnd := 0
 	for i := 0; i < int(intro.Entries); i++ {
 		var tag headerTag
 		if err := binary.Read(buf, binary.BigEndian, &tag); err != nil {
 			return nil, err
 		}
 		typeSize, ok := typeSizes[tag.DataType]
+		if tag.Offset < 0 || int(tag.Offset) > len(data) || tag.Count < 0 || (!ok && tag.Count == 0) {
+			return nil, fmt.Errorf("tag %d is out of range", tag.Tag)
+		}
+		// like rpmlib, tag data must not overlap, except for a leading region tag
+		region := i == 0 && tag.Tag < RPMTAG_HEADERREGIONS
+		if !region && int(tag.Offset) < prevEnd {
+			return nil, fmt.Errorf("tag %d overlaps the previous tag", tag.Tag)
+		}
 		var end int
 		if ok {
 			end = int(tag.Offset) + typeSize*int(tag.Count)
+			if end > len(data) {
+				return nil, fmt.Errorf("tag %d is truncated", tag.Tag)
+			}
 		} else {
 			// String types are null-terminated
 			end = int(tag.Offset)
@@ -130,6 +150,9 @@ func readHeader(f io.Reader, hash string, hashType crypto.Hash, isSource bool, s
 				}
 				end += next + 1
 			}
+		}
+		if !region {
+			prevEnd = end
 		}
 		ents[int(tag.Tag)] = entry{
 			dataType: tag.DataType,

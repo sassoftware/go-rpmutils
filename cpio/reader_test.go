@@ -17,8 +17,10 @@
 package cpio
 
 import (
+	"bytes"
 	"io"
 	"os"
+	"runtime"
 	"testing"
 	"testing/iotest"
 )
@@ -47,5 +49,22 @@ func TestReadStripped(t *testing.T) {
 	_, err = r.Next()
 	if err != io.EOF {
 		t.Fatalf("wrong error: %v", err)
+	}
+}
+
+func TestCountingReaderSeek(t *testing.T) {
+	const size = 16 * 1024 * 1024
+	cr := &countingReader{stream: bytes.NewReader(make([]byte, size))}
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
+	if _, err := cr.Seek(size, 1); err != nil {
+		t.Fatal(err)
+	}
+	runtime.ReadMemStats(&after)
+	if cr.curPos != size {
+		t.Fatalf("wrong position %d", cr.curPos)
+	}
+	if allocated := after.TotalAlloc - before.TotalAlloc; allocated >= size/2 {
+		t.Fatalf("seeking allocated %d bytes", allocated)
 	}
 }
